@@ -17,6 +17,7 @@ auto_update=false
 if [[ -f "$state_dir/auto-update" ]] && [[ "$(sed -n '1p' "$state_dir/auto-update")" == "enabled" ]]; then
   auto_update=true
 fi
+atlas_package=""
 
 while (($#)); do
   case "$1" in
@@ -36,8 +37,16 @@ while (($#)); do
       auto_update=false
       shift
       ;;
+    --install-atlas)
+      if (($# < 2)); then
+        echo "ERROR: --install-atlas requires the path to an ATLAS .deb" >&2
+        exit 2
+      fi
+      atlas_package="$2"
+      shift 2
+      ;;
     -h|--help)
-      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update]"
+      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-atlas PACKAGE.deb]"
       exit 0
       ;;
     *)
@@ -64,6 +73,26 @@ else
   printf '%s\n' disabled > "$state_dir/auto-update"
 fi
 chmod 0600 "$state_dir/container" "$state_dir/source-path" "$state_dir/auto-update"
+
+if [[ -n "$atlas_package" ]]; then
+  if [[ -L "$atlas_package" || ! -f "$atlas_package" ]]; then
+    echo "ERROR: ATLAS package must be a regular, non-symlink file: $atlas_package" >&2
+    exit 2
+  fi
+  package_path="$(readlink -f -- "$atlas_package")"
+  home_path="$(readlink -f -- "$HOME")"
+  case "$package_path" in
+    "$home_path"/*) ;;
+    *)
+      echo "ERROR: ATLAS package must be stored under your home directory" >&2
+      exit 2
+      ;;
+  esac
+  if [[ "${package_path,,}" != *.deb ]]; then
+    echo "ERROR: ATLAS package filename must end in .deb" >&2
+    exit 2
+  fi
+fi
 
 current_vnd_handler="$(xdg-mime query default application/vnd.debian.binary-package 2>/dev/null || true)"
 current_xdeb_handler="$(xdg-mime query default application/x-deb 2>/dev/null || true)"
@@ -96,6 +125,23 @@ fi
 
 xdg-mime default atlas-steamos-updater.desktop application/vnd.debian.binary-package
 xdg-mime default atlas-steamos-updater.desktop application/x-deb
+
+if [[ -n "$atlas_package" ]]; then
+  if distrobox enter "$container" -- test -e /usr/bin/atlas-preview; then
+    echo "ERROR: ATLAS is already installed in Distrobox '$container'; use the normal updater" >&2
+    exit 2
+  fi
+  state_name="atlas.json"
+  if [[ "$container" != "atlas" ]]; then
+    state_name="atlas-$container.json"
+  fi
+  echo "Validating and installing the initial ATLAS package in Distrobox '$container'..."
+  distrobox enter "$container" -- \
+    sudo python3 "$libexec_dir/atlas_deb_installer.py" \
+      --install \
+      --state-file "$state_dir/$state_name" \
+      "$package_path"
+fi
 
 echo "Installed ATLAS SteamOS Updater."
 echo "Distrobox: $container"

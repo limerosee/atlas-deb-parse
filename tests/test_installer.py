@@ -67,13 +67,20 @@ def ar_archive(members: dict[str, bytes]) -> bytes:
     return bytes(result)
 
 
-def make_deb(path: Path, files: dict[str, bytes] = FILES, *, package: str = "atlas", symlink: str | None = None) -> None:
+def make_deb(
+    path: Path,
+    files: dict[str, bytes] = FILES,
+    *,
+    package: str = "atlas",
+    version: str = "0.5.1-r2",
+    symlink: str | None = None,
+) -> None:
     md5sums = "".join(
         f"{hashlib.md5(data, usedforsecurity=False).hexdigest()}  {name}\n"
         for name, data in files.items()
     ).encode()
     control = (
-        f"Package: {package}\nVersion: 0.5.1-r2\nArchitecture: amd64\nDescription: test\n"
+        f"Package: {package}\nVersion: {version}\nArchitecture: amd64\nDescription: test\n"
     ).encode()
     control_tar = tar_gz({"control": control, "md5sums": md5sums})
     data_tar = tar_gz(files, symlink=symlink)
@@ -192,6 +199,14 @@ class InstallerTests(unittest.TestCase):
             self.assertTrue((root / "usr/bin/atlas-preview").is_file())
             self.assertTrue(backup.is_dir())
             self.assertEqual(capabilities, [])
+
+    def test_accepts_arbitrary_deb_filename_and_safe_version(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            package = Path(directory) / "my-atlas-bootstrap-package.deb"
+            make_deb(package, version="1.20.3-r17")
+            info = inspect_package(package)
+            self.assertEqual(info.package, "atlas")
+            self.assertEqual(info.version, "1.20.3-r17")
 
     def test_rejects_wrong_package(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

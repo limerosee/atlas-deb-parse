@@ -143,25 +143,38 @@ distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fe
 distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap
 ```
 
-Point the host handler at the test container:
+Place the initial ATLAS Debian package anywhere under your home directory, then
+configure the handler and bootstrap ATLAS in the test container in one command:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --container atlas-updater-test --auto-update
+./install.sh \
+  --container atlas-updater-test \
+  --auto-update \
+  --install-atlas "$HOME/path/to/your-atlas-package.deb"
 ```
 
-Open the ATLAS `.deb` normally and answer `Y` to test validation and
-installation inside `atlas-updater-test`. State files are separate for each
-configured container. When testing is finished, switch the handler back to the
-real container:
+The filename and version may differ, but the filename must end in `.deb`. The
+same strict validator still requires package `atlas`, architecture `amd64`, and
+the allow-listed payload. Symlinks, non-ATLAS packages, and files outside your
+home directory are rejected. Bootstrap also refuses to replace an ATLAS binary
+already present in that container.
+
+After a successful bootstrap, launch the test copy directly:
+
+```bash
+distrobox enter atlas-updater-test -- /usr/bin/atlas-preview
+```
+
+Later ATLAS updates use the normal MIME handler and confirmation flow. State
+files are separate for each configured container. When testing is finished,
+switch the handler back to the real container:
 
 ```bash
 ./install.sh --container atlas --auto-update
 ```
 
-The container selection is preserved by later `./install.sh` runs. The test
-container does not contain your working ATLAS installation unless you install
-the package there.
+The container selection is preserved by later `./install.sh` runs.
 
 ## Event log
 
