@@ -116,6 +116,28 @@ capabilities, and offers to relaunch ATLAS.
 
 Packages outside ATLAS's own update directory are rejected.
 
+## Event log
+
+The host handler records short JSON events in:
+
+```text
+~/.local/state/atlas-steamos-updater/events.log
+```
+
+View the latest attempts on the SteamOS host with:
+
+```bash
+tail -n 50 "$HOME/.local/state/atlas-steamos-updater/events.log"
+```
+
+The events distinguish `open-request`, `validated`, `cancelled`, `failed`, and
+`installed`. An `installed` event also records whether ATLAS was relaunched.
+The log contains the update filename, version and SHA-256 when available, but
+never package contents. It rotates at 64 KiB; the previous file is retained as
+`events.log.old`. Logging errors never block the updater.
+If an attempted open produces no `open-request` event, the MIME handler was not
+launched at all.
+
 ## Backups and rollback
 
 Before replacing anything, the container installer stores the existing files

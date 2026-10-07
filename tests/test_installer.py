@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import atlas_deb_installer
 from atlas_deb_installer import PackageError, inspect_package, install_package
-from atlas_steamos_updater import version_key
+from atlas_steamos_updater import log_event, version_key
 
 
 FILES = {
@@ -83,6 +83,30 @@ def make_deb(path: Path, files: dict[str, bytes] = FILES, *, package: str = "atl
 class InstallerTests(unittest.TestCase):
     def test_atlas_revision_ordering(self) -> None:
         self.assertLess(version_key("0.5.1-r2"), version_key("0.5.1-r10"))
+
+    def test_event_log_records_status(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.dict("os.environ", {"HOME": directory}):
+                log_event(
+                    "validated",
+                    file="ATLAS_0.5.1_r2_linux-x64.deb",
+                    version="0.5.1-r2",
+                )
+            log_file = (
+                Path(directory)
+                / ".local/state/atlas-steamos-updater/events.log"
+            )
+            record = log_file.read_text()
+            self.assertIn('"event": "validated"', record)
+            self.assertIn('"version": "0.5.1-r2"', record)
+
+    def test_event_log_failure_does_not_escape(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / ".local/state/atlas-steamos-updater"
+            state_path.parent.mkdir(parents=True)
+            state_path.write_text("not a directory")
+            with mock.patch.dict("os.environ", {"HOME": directory}):
+                log_event("open-request", file="update.deb")
 
     def test_valid_package_and_test_root_install(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

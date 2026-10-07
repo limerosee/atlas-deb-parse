@@ -11,15 +11,49 @@ import re
 import shutil
 import subprocess
 import sys
+import datetime as dt
 from urllib.parse import unquote, urlparse
 
 
 APP_ID = "com.nanitnet.atlas"
 CONTAINER = "atlas"
+MAX_LOG_SIZE = 64 * 1024
 
 
 class HandlerError(RuntimeError):
     pass
+
+
+def log_event(event: str, **fields: object) -> None:
+    """Append a short JSON event without ever blocking the updater."""
+    try:
+        state_dir = Path.home() / ".local" / "state" / "atlas-steamos-updater"
+        state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if state_dir.is_symlink() or not state_dir.is_dir():
+            return
+        log_file = state_dir / "events.log"
+        old_log = state_dir / "events.log.old"
+        if log_file.exists():
+            if log_file.is_symlink() or not log_file.is_file():
+                return
+            if log_file.stat().st_size >= MAX_LOG_SIZE:
+                os.replace(log_file, old_log)
+        record = {
+            "time": dt.datetime.now(dt.timezone.utc).isoformat(),
+            "event": event,
+        }
+        for key, value in fields.items():
+            if isinstance(value, str):
+                value = value[:500]
+            record[key] = value
+        flags = os.O_WRONLY | os.O_APPEND | os.O_CREAT
+        if hasattr(os, "O_NOFOLLOW"):
+            flags |= os.O_NOFOLLOW
+        descriptor = os.open(log_file, flags, 0o600)
+        with os.fdopen(descriptor, "a", encoding="utf-8") as stream:
+            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except (OSError, TypeError, ValueError):
+        pass
 
 
 def file_argument(value: str) -> Path:
@@ -97,6 +131,9 @@ def main() -> int:
     parser.add_argument("update")
     parser.add_argument("--no-relaunch", action="store_true")
     args = parser.parse_args()
+    parsed_input = urlparse(args.update)
+    update_name = Path(unquote(parsed_input.path)).name or "<unknown>"
+    log_event("open-request", file=update_name)
 
     try:
         if not shutil.which("distrobox"):
@@ -129,6 +166,12 @@ def main() -> int:
             detail = inspect_result.stderr.strip() or inspect_result.stdout.strip()
             raise HandlerError(f"package validation failed: {detail}")
         details = json.loads(inspect_result.stdout)
+        log_event(
+            "validated",
+            file=path.name,
+            version=details.get("version"),
+            sha256=details.get("sha256"),
+        )
         state_file = (
             Path.home()
             / ".local"
@@ -143,6 +186,7 @@ def main() -> int:
         print(f"  Files:   {len(details['files'])}")
         print("The Debian maintainer scripts will NOT be executed.")
         if not prompt("Install this update into Distrobox 'atlas'?"):
+            log_event("cancelled", file=path.name, version=details.get("version"))
             print("Cancelled.")
             return 0
 
@@ -170,6 +214,7 @@ def main() -> int:
         if install_result.returncode:
             raise HandlerError("installation failed; see the error above")
 
+        relaunched = False
         if not args.no_relaunch and prompt("Relaunch ATLAS now?"):
             subprocess.Popen(
                 ["distrobox", "enter", CONTAINER, "--", "/usr/bin/atlas-preview"],
@@ -178,9 +223,18 @@ def main() -> int:
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
             )
+            relaunched = True
+        log_event(
+            "installed",
+            file=path.name,
+            version=details.get("version"),
+            sha256=details.get("sha256"),
+            relaunched=relaunched,
+        )
         print("Done. You may close this terminal.")
         return 0
     except (HandlerError, OSError, json.JSONDecodeError) as exc:
+        log_event("failed", file=update_name, error=str(exc))
         print(f"ERROR: {exc}", file=sys.stderr)
         try:
             input("Press Enter to close...")
