@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.deb
+*.rpm
+*.tar
+*.tar.gz
+*.tar.xz
+*.tar.zst
+.env
+.env.*
+*.pem
+*.key
+*.p12
+atlas-updater-analysis*
+ATLAS_*

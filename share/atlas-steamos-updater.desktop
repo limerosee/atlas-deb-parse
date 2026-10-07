@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ATLAS SteamOS Updater
+Comment=Install ATLAS updates inside its Distrobox
+Exec="@HANDLER@" %U
+Terminal=true
+NoDisplay=true
+MimeType=application/vnd.debian.binary-package;application/x-deb;
+Categories=System;
