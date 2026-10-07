@@ -16,7 +16,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import atlas_deb_installer
 from atlas_deb_installer import PackageError, inspect_package, install_package
-from atlas_steamos_updater import log_event, prompt, version_key
+from atlas_steamos_updater import (
+    HandlerError,
+    auto_update_enabled,
+    configured_container,
+    log_event,
+    prompt,
+    self_update,
+    version_key,
+)
 
 
 FILES = {
@@ -107,6 +115,53 @@ class InstallerTests(unittest.TestCase):
             state_path.write_text("not a directory")
             with mock.patch.dict("os.environ", {"HOME": directory}):
                 log_event("open-request", file="update.deb")
+
+    def test_reads_container_and_auto_update_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / ".local/state/atlas-steamos-updater"
+            state.mkdir(parents=True)
+            (state / "container").write_text("atlas-test\n")
+            (state / "auto-update").write_text("enabled\n")
+            with mock.patch.dict("os.environ", {"HOME": directory}):
+                self.assertEqual(configured_container(), "atlas-test")
+                self.assertTrue(auto_update_enabled())
+
+    def test_rejects_invalid_container_setting(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state = Path(directory) / ".local/state/atlas-steamos-updater"
+            state.mkdir(parents=True)
+            (state / "container").write_text("atlas;bad\n")
+            with mock.patch.dict("os.environ", {"HOME": directory}):
+                with self.assertRaisesRegex(HandlerError, "invalid Distrobox"):
+                    configured_container()
+
+    def test_self_update_fast_forwards_and_refreshes_scripts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            source = home / "atlas-steamos-updater"
+            (source / "src").mkdir(parents=True)
+            (source / "src/atlas_steamos_updater.py").write_text("host")
+            (source / "src/atlas_deb_installer.py").write_text("installer")
+            state = home / ".local/state/atlas-steamos-updater"
+            state.mkdir(parents=True)
+            (state / "source-path").write_text(str(source))
+            completed = [
+                mock.Mock(returncode=0, stdout="https://github.com/limerosee/atlas-deb-parse.git\n", stderr=""),
+                mock.Mock(returncode=0, stdout="", stderr=""),
+                mock.Mock(returncode=0, stdout="a" * 40 + "\n", stderr=""),
+                mock.Mock(returncode=0, stdout="Updating\n", stderr=""),
+                mock.Mock(returncode=0, stdout="b" * 40 + "\n", stderr=""),
+            ]
+            with mock.patch.dict("os.environ", {"HOME": directory}):
+                with mock.patch(
+                    "atlas_steamos_updater.run_in_container",
+                    side_effect=completed,
+                ) as run_mock:
+                    with mock.patch("atlas_steamos_updater.atomic_copy") as copy_mock:
+                        self_update("atlas-test")
+            self.assertIn("pull", run_mock.call_args_list[3].args[0])
+            self.assertEqual(run_mock.call_args_list[3].kwargs["container"], "atlas-test")
+            self.assertEqual(copy_mock.call_count, 2)
 
     def test_prompt_accepts_explicit_y(self) -> None:
         with mock.patch("builtins.input", return_value="Y"):

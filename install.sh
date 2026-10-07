@@ -9,6 +9,62 @@ state_dir="$HOME/.local/state/atlas-steamos-updater"
 
 mkdir -p "$bin_dir" "$libexec_dir" "$applications_dir" "$state_dir"
 
+container="atlas"
+if [[ -f "$state_dir/container" ]]; then
+  container="$(sed -n '1p' "$state_dir/container")"
+fi
+auto_update=false
+if [[ -f "$state_dir/auto-update" ]] && [[ "$(sed -n '1p' "$state_dir/auto-update")" == "enabled" ]]; then
+  auto_update=true
+fi
+
+while (($#)); do
+  case "$1" in
+    --container)
+      if (($# < 2)); then
+        echo "ERROR: --container requires a Distrobox name" >&2
+        exit 2
+      fi
+      container="$2"
+      shift 2
+      ;;
+    --auto-update)
+      auto_update=true
+      shift
+      ;;
+    --no-auto-update)
+      auto_update=false
+      shift
+      ;;
+    -h|--help)
+      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update]"
+      exit 0
+      ;;
+    *)
+      echo "ERROR: unknown option: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ ! "$container" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+  echo "ERROR: invalid Distrobox name: $container" >&2
+  exit 2
+fi
+if [[ "$project_dir" == *$'\n'* || "$project_dir" == *$'\r'* ]]; then
+  echo "ERROR: project path contains a line break" >&2
+  exit 2
+fi
+
+printf '%s\n' "$container" > "$state_dir/container"
+printf '%s\n' "$project_dir" > "$state_dir/source-path"
+if [[ "$auto_update" == true ]]; then
+  printf '%s\n' enabled > "$state_dir/auto-update"
+else
+  printf '%s\n' disabled > "$state_dir/auto-update"
+fi
+chmod 0600 "$state_dir/container" "$state_dir/source-path" "$state_dir/auto-update"
+
 current_vnd_handler="$(xdg-mime query default application/vnd.debian.binary-package 2>/dev/null || true)"
 current_xdeb_handler="$(xdg-mime query default application/x-deb 2>/dev/null || true)"
 if [[ "$current_vnd_handler" != "atlas-steamos-updater.desktop" ]]; then
@@ -42,4 +98,6 @@ xdg-mime default atlas-steamos-updater.desktop application/vnd.debian.binary-pac
 xdg-mime default atlas-steamos-updater.desktop application/x-deb
 
 echo "Installed ATLAS SteamOS Updater."
+echo "Distrobox: $container"
+echo "Updater self-update: $auto_update"
 echo "ATLAS .deb updates will open in a terminal and require confirmation."

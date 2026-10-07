@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
 from pathlib import Path
@@ -11,17 +12,38 @@ import re
 import shutil
 import subprocess
 import sys
-import datetime as dt
 from urllib.parse import unquote, urlparse
 
 
 APP_ID = "com.nanitnet.atlas"
-CONTAINER = "atlas"
+DEFAULT_CONTAINER = "atlas"
+TRUSTED_SOURCE = "https://github.com/limerosee/atlas-deb-parse"
 MAX_LOG_SIZE = 64 * 1024
 
 
 class HandlerError(RuntimeError):
     pass
+
+
+def read_setting(name: str) -> str | None:
+    path = Path.home() / ".local" / "state" / "atlas-steamos-updater" / name
+    try:
+        if path.is_symlink() or not path.is_file():
+            return None
+        return path.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+
+
+def configured_container() -> str:
+    value = read_setting("container") or DEFAULT_CONTAINER
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", value):
+        raise HandlerError("invalid Distrobox name in updater configuration")
+    return value
+
+
+def auto_update_enabled() -> bool:
+    return read_setting("auto-update") == "enabled"
 
 
 def log_event(event: str, **fields: object) -> None:
@@ -79,8 +101,13 @@ def ensure_update_location(path: Path) -> Path:
     return allowed
 
 
-def run_in_container(arguments: list[str], *, capture: bool = False) -> subprocess.CompletedProcess[str]:
-    command = ["distrobox", "enter", CONTAINER, "--", *arguments]
+def run_in_container(
+    arguments: list[str],
+    *,
+    container: str = DEFAULT_CONTAINER,
+    capture: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    command = ["distrobox", "enter", container, "--", *arguments]
     return subprocess.run(
         command,
         check=False,
@@ -88,6 +115,103 @@ def run_in_container(arguments: list[str], *, capture: bool = False) -> subproce
         stdout=subprocess.PIPE if capture else None,
         stderr=subprocess.PIPE if capture else None,
     )
+
+
+def normalized_origin(value: str) -> str:
+    return value.strip().removesuffix("/").removesuffix(".git")
+
+
+def atomic_copy(source: Path, destination: Path, mode: int) -> None:
+    if source.is_symlink() or not source.is_file():
+        raise HandlerError(f"self-update source is not a regular file: {source}")
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(f".{destination.name}.new-{os.getpid()}")
+    try:
+        with source.open("rb") as input_stream, temporary.open("xb") as output_stream:
+            shutil.copyfileobj(input_stream, output_stream)
+            output_stream.flush()
+            os.fsync(output_stream.fileno())
+        os.chmod(temporary, mode)
+        os.replace(temporary, destination)
+    finally:
+        if temporary.exists():
+            temporary.unlink()
+
+
+def self_update(container: str) -> None:
+    source_value = read_setting("source-path")
+    if not source_value:
+        raise HandlerError("self-update source path is not configured; run install.sh again")
+    source = Path(source_value).expanduser()
+    if source.is_symlink() or not source.is_dir():
+        raise HandlerError(f"self-update source directory is unavailable: {source}")
+    source = source.resolve(strict=True)
+
+    origin_result = run_in_container(
+        ["git", "-C", str(source), "remote", "get-url", "origin"],
+        container=container,
+        capture=True,
+    )
+    if origin_result.returncode or normalized_origin(origin_result.stdout) != TRUSTED_SOURCE:
+        raise HandlerError("self-update refused: repository origin is not trusted")
+
+    status_result = run_in_container(
+        ["git", "-C", str(source), "status", "--porcelain"],
+        container=container,
+        capture=True,
+    )
+    if status_result.returncode:
+        raise HandlerError("self-update could not inspect the repository")
+    if status_result.stdout.strip():
+        raise HandlerError("self-update refused: repository has local changes")
+
+    old_result = run_in_container(
+        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        container=container,
+        capture=True,
+    )
+    pull_result = run_in_container(
+        ["git", "-C", str(source), "pull", "--ff-only"],
+        container=container,
+        capture=True,
+    )
+    if old_result.returncode or pull_result.returncode:
+        detail = pull_result.stderr.strip() or pull_result.stdout.strip()
+        raise HandlerError(f"self-update failed: {detail or 'git pull failed'}")
+    new_result = run_in_container(
+        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        container=container,
+        capture=True,
+    )
+    if new_result.returncode:
+        raise HandlerError("self-update could not read the updated revision")
+
+    atomic_copy(
+        source / "src" / "atlas_steamos_updater.py",
+        Path.home() / ".local" / "bin" / "atlas-steamos-updater",
+        0o755,
+    )
+    atomic_copy(
+        source / "src" / "atlas_deb_installer.py",
+        Path.home()
+        / ".local"
+        / "libexec"
+        / "atlas-steamos-updater"
+        / "atlas_deb_installer.py",
+        0o755,
+    )
+    old_revision = old_result.stdout.strip()
+    new_revision = new_result.stdout.strip()
+    log_event(
+        "self-update",
+        status="updated" if new_revision != old_revision else "current",
+        old_revision=old_revision,
+        new_revision=new_revision,
+    )
+    if new_revision == old_revision:
+        print("Updater is already current.")
+    else:
+        print(f"Updater refreshed: {old_revision[:7]} -> {new_revision[:7]}")
 
 
 def prompt(question: str) -> bool:
@@ -144,6 +268,7 @@ def main() -> int:
     try:
         if not shutil.which("distrobox"):
             raise HandlerError("distrobox is not installed")
+        container = configured_container()
         path = file_argument(args.update)
         allowed = ensure_update_location(path)
         installer = (
@@ -166,6 +291,7 @@ def main() -> int:
                 str(allowed),
                 str(path),
             ],
+            container=container,
             capture=True,
         )
         if inspect_result.returncode:
@@ -178,12 +304,9 @@ def main() -> int:
             version=details.get("version"),
             sha256=details.get("sha256"),
         )
+        state_name = "atlas.json" if container == DEFAULT_CONTAINER else f"atlas-{container}.json"
         state_file = (
-            Path.home()
-            / ".local"
-            / "state"
-            / "atlas-steamos-updater"
-            / "atlas.json"
+            Path.home() / ".local" / "state" / "atlas-steamos-updater" / state_name
         )
         reject_reinstall_or_downgrade(details, state_file)
         print("Validated ATLAS update")
@@ -196,11 +319,26 @@ def main() -> int:
             print("Cancelled.")
             return 0
 
-        process_check = run_in_container(["pgrep", "-x", "atlas-preview"], capture=True)
+        if auto_update_enabled():
+            try:
+                self_update(container)
+            except HandlerError as exc:
+                log_event("self-update", status="failed", error=str(exc))
+                print(f"WARNING: {exc}", file=sys.stderr)
+                print("Continuing with the currently installed updater.")
+
+        process_check = run_in_container(
+            ["pgrep", "-x", "atlas-preview"],
+            container=container,
+            capture=True,
+        )
         if process_check.returncode == 0:
             if not prompt("ATLAS is running. Would you like to close it before updating?"):
                 raise HandlerError("ATLAS must be closed before installation")
-            stop_result = run_in_container(["pkill", "-TERM", "-x", "atlas-preview"])
+            stop_result = run_in_container(
+                ["pkill", "-TERM", "-x", "atlas-preview"],
+                container=container,
+            )
             if stop_result.returncode not in {0, 1}:
                 raise HandlerError("could not stop ATLAS")
 
@@ -215,7 +353,8 @@ def main() -> int:
                 "--state-file",
                 str(state_file),
                 str(path),
-            ]
+            ],
+            container=container,
         )
         if install_result.returncode:
             raise HandlerError("installation failed; see the error above")
@@ -223,7 +362,7 @@ def main() -> int:
         relaunched = False
         if not args.no_relaunch and prompt("Would you like to open ATLAS now?"):
             subprocess.Popen(
-                ["distrobox", "enter", CONTAINER, "--", "/usr/bin/atlas-preview"],
+                ["distrobox", "enter", container, "--", "/usr/bin/atlas-preview"],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

@@ -100,11 +100,26 @@ updater scripts with the current repository version:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh
+./install.sh --auto-update
 ```
 
 Do not run `install.sh` inside the container: it registers the host-side MIME
 handler used when ATLAS opens a downloaded `.deb` file.
+
+`--auto-update` is opt-in. When enabled, the updater checks this repository with
+`git pull --ff-only` only after you answer `Y` to `Would you like to update
+ATLAS?`. It never updates merely because the package was opened. The checkout
+must be clean and its origin must be exactly this GitHub repository. A failed
+self-update is logged and the already installed updater remains usable.
+
+To disable this behavior while keeping the regular updater installed:
+
+```bash
+./install.sh --no-auto-update
+```
+
+The selected setting is preserved by later `./install.sh` runs unless you pass
+one of these options again.
 
 The installer records the previous `.deb` MIME handler and makes
 `atlas-steamos-updater.desktop` the handler for Debian packages.
@@ -118,6 +133,35 @@ confirmation, requests the container sudo password, installs the update, and
 restores capabilities.
 
 Packages outside ATLAS's own update directory are rejected.
+
+## Test in a separate Distrobox
+
+Create a separate Fedora container on the SteamOS host:
+
+```bash
+distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest
+distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap
+```
+
+Point the host handler at the test container:
+
+```bash
+cd "$HOME/atlas-steamos-updater"
+./install.sh --container atlas-updater-test --auto-update
+```
+
+Open the ATLAS `.deb` normally and answer `Y` to test validation and
+installation inside `atlas-updater-test`. State files are separate for each
+configured container. When testing is finished, switch the handler back to the
+real container:
+
+```bash
+./install.sh --container atlas --auto-update
+```
+
+The container selection is preserved by later `./install.sh` runs. The test
+container does not contain your working ATLAS installation unless you install
+the package there.
 
 ## Event log
 
@@ -133,8 +177,9 @@ View the latest attempts on the SteamOS host with:
 tail -n 50 "$HOME/.local/state/atlas-steamos-updater/events.log"
 ```
 
-The events distinguish `open-request`, `validated`, `cancelled`, `failed`, and
-`installed`. An `installed` event also records whether ATLAS was relaunched.
+The events distinguish `open-request`, `validated`, `cancelled`, `failed`,
+`self-update`, and `installed`. An `installed` event also records whether ATLAS
+was relaunched.
 The log contains the update filename, version and SHA-256 when available, but
 never package contents. It rotates at 64 KiB; the previous file is retained as
 `events.log.old`. Logging errors never block the updater.

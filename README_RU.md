@@ -105,11 +105,27 @@ distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh
+./install.sh --auto-update
 ```
 
 Не запускайте `install.sh` внутри контейнера: он регистрирует MIME-обработчик на
 хосте, который используется, когда ATLAS открывает скачанный `.deb`.
+
+Параметр `--auto-update` включается явно. Когда он активен, updater выполняет
+`git pull --ff-only` только после ответа `Y` на вопрос `Would you like to update
+ATLAS?`. Простое открытие пакета не запускает самообновление. Checkout должен
+быть чистым, а его origin должен точно указывать на этот GitHub-репозиторий.
+Ошибка самообновления записывается в журнал, а уже установленная версия updater
+остаётся работоспособной.
+
+Чтобы отключить самообновление, сохранив обычный updater:
+
+```bash
+./install.sh --no-auto-update
+```
+
+Выбранная настройка сохраняется при следующих запусках `./install.sh`, пока вы
+снова не передадите один из этих параметров.
 
 Установщик сохраняет предыдущий обработчик MIME для `.deb` и назначает
 `atlas-steamos-updater.desktop` обработчиком Debian-пакетов.
@@ -123,6 +139,34 @@ like to open ATLAS now? [Y/N]`; ответ `Y` немедленно запуск
 обновление и восстанавливает capabilities.
 
 Пакеты вне собственного каталога обновлений ATLAS отклоняются.
+
+## Проверка в отдельном Distrobox
+
+Создайте отдельный Fedora-контейнер на хосте SteamOS:
+
+```bash
+distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest
+distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap
+```
+
+Переключите обработчик на тестовый контейнер:
+
+```bash
+cd "$HOME/atlas-steamos-updater"
+./install.sh --container atlas-updater-test --auto-update
+```
+
+Откройте `.deb` ATLAS обычным способом и ответьте `Y`, чтобы проверить валидацию
+и установку внутри `atlas-updater-test`. Для каждого настроенного контейнера
+используется отдельный state-файл. После проверки верните обработчик на рабочий
+контейнер:
+
+```bash
+./install.sh --container atlas --auto-update
+```
+
+Выбор контейнера сохраняется при следующих запусках `./install.sh`. В тестовом
+контейнере нет рабочей установки ATLAS, пока вы не установите туда пакет.
 
 ## Журнал событий
 
@@ -138,9 +182,10 @@ like to open ATLAS now? [Y/N]`; ответ `Y` немедленно запуск
 tail -n 50 "$HOME/.local/state/atlas-steamos-updater/events.log"
 ```
 
-События `open-request`, `validated`, `cancelled`, `failed` и `installed`
-показывают, было ли обновление открыто, проверено, отменено, отклонено или
-установлено. В событии `installed` также указано, был ли ATLAS перезапущен.
+События `open-request`, `validated`, `cancelled`, `failed`, `self-update` и
+`installed` показывают, было ли обновление открыто, проверено, отменено,
+отклонено, установлено и выполнялось ли самообновление. В событии `installed`
+также указано, был ли ATLAS перезапущен.
 Журнал содержит имя файла, версию и SHA-256, когда они доступны, но не содержит
 данные пакета. При достижении 64 КиБ журнал ротируется, а предыдущий файл
 сохраняется как `events.log.old`. Ошибка записи журнала не блокирует updater.
