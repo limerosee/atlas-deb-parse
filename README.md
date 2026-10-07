@@ -41,13 +41,14 @@ metadata, payload allow-listing, hashes, and user confirmation.
 - SteamOS Desktop Mode
 - Distrobox container named `atlas`
 - Python 3 in the host and container
-- Fedora packages `binutils`, `zstd`, and `libcap` in the container
+- Fedora packages `binutils`, `zstd`, `libcap`, `gtk3`, `webkit2gtk4.1`, and
+  `libayatana-appindicator-gtk3` in the container
 - `xdg-mime` on the host
 
 Inside the container:
 
 ```bash
-sudo dnf install -y binutils zstd libcap
+sudo dnf install -y binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 ## Install
@@ -55,7 +56,7 @@ sudo dnf install -y binutils zstd libcap
 Install the container dependencies first:
 
 ```bash
-distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap
+distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 ### First installation: clone
@@ -121,6 +122,14 @@ To disable this behavior while keeping the regular updater installed:
 The selected setting is preserved by later `./install.sh` runs unless you pass
 one of these options again.
 
+Initial bootstrap with `--install-atlas` automatically installs the known
+Fedora runtime equivalents of ATLAS's Debian dependencies. To install or repair
+only these dependencies in an existing container without reinstalling ATLAS:
+
+```bash
+./install.sh --container atlas --install-dependencies
+```
+
 The installer records the previous `.deb` MIME handler and makes
 `atlas-steamos-updater.desktop` the handler for Debian packages.
 
@@ -140,7 +149,7 @@ Create a separate Fedora container on the SteamOS host:
 
 ```bash
 distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest
-distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap
+distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 Place one or more ATLAS Debian packages directly in `$HOME/Downloads`, then run

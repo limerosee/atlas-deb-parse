@@ -19,6 +19,7 @@ if [[ -f "$state_dir/auto-update" ]] && [[ "$(sed -n '1p' "$state_dir/auto-updat
 fi
 atlas_package=""
 scan_downloads=false
+install_dependencies=false
 
 while (($#)); do
   case "$1" in
@@ -39,6 +40,7 @@ while (($#)); do
       shift
       ;;
     --install-atlas)
+      install_dependencies=true
       if (($# >= 2)) && [[ "$2" != --* ]]; then
         atlas_package="$2"
         shift 2
@@ -47,8 +49,12 @@ while (($#)); do
         shift
       fi
       ;;
+    --install-dependencies)
+      install_dependencies=true
+      shift
+      ;;
     -h|--help)
-      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-atlas [PACKAGE.deb]]"
+      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-dependencies] [--install-atlas [PACKAGE.deb]]"
       exit 0
       ;;
     *)
@@ -107,6 +113,18 @@ fi
 
 xdg-mime default atlas-steamos-updater.desktop application/vnd.debian.binary-package
 xdg-mime default atlas-steamos-updater.desktop application/x-deb
+
+if [[ "$install_dependencies" == true ]]; then
+  echo "Installing ATLAS runtime dependencies in Distrobox '$container'..."
+  distrobox enter "$container" -- sudo dnf install -y \
+    git \
+    binutils \
+    zstd \
+    libcap \
+    gtk3 \
+    webkit2gtk4.1 \
+    libayatana-appindicator-gtk3
+fi
 
 if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
   if distrobox enter "$container" -- test -e /usr/bin/atlas-preview; then

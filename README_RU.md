@@ -45,13 +45,14 @@ ATLAS проверяет подписанный манифест обновле�
 - SteamOS в режиме рабочего стола
 - Distrobox-контейнер с именем `atlas`
 - Python 3 на хосте и в контейнере
-- Fedora-пакеты `binutils`, `zstd` и `libcap` в контейнере
+- Fedora-пакеты `binutils`, `zstd`, `libcap`, `gtk3`, `webkit2gtk4.1` и
+  `libayatana-appindicator-gtk3` в контейнере
 - `xdg-mime` на хосте
 
 Внутри контейнера выполните:
 
 ```bash
-sudo dnf install -y binutils zstd libcap
+sudo dnf install -y binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 ## Установка
@@ -59,7 +60,7 @@ sudo dnf install -y binutils zstd libcap
 Сначала установите зависимости контейнера:
 
 ```bash
-distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap
+distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 ### Первая установка: клонирование
@@ -127,6 +128,15 @@ ATLAS?`. Простое открытие пакета не запускает с
 Выбранная настройка сохраняется при следующих запусках `./install.sh`, пока вы
 снова не передадите один из этих параметров.
 
+При начальной установке параметр `--install-atlas` автоматически устанавливает
+известные Fedora-эквиваленты Debian-зависимостей ATLAS. Чтобы установить или
+восстановить только эти зависимости в существующем контейнере без повторной
+установки ATLAS:
+
+```bash
+./install.sh --container atlas --install-dependencies
+```
+
 Установщик сохраняет предыдущий обработчик MIME для `.deb` и назначает
 `atlas-steamos-updater.desktop` обработчиком Debian-пакетов.
 
@@ -146,7 +156,7 @@ like to open ATLAS now? [Y/N]`; ответ `Y` немедленно запуск
 
 ```bash
 distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest
-distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap
+distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 Поместите один или несколько Debian-пакетов ATLAS непосредственно в
