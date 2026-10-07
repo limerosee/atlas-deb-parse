@@ -205,10 +205,9 @@ When ATLAS downloads an update and opens it, a terminal appears. The updater
 shows the package version and SHA-256, then asks `Would you like to update
 ATLAS? [Y/N]`. After a successful installation it asks `Would you like to open
 ATLAS now? [Y/N]`; answering `Y` launches ATLAS immediately. Each prompt
-accepts `Y`, `yes`, `да`, `agree`, or `1` for approval, and `N`, `no`, `нет`,
-`none`, `cancel`, or `2` to decline. Press Enter after the answer; empty input
-repeats the question. In the package menu numbers select packages instead,
-and `N`, `no`, `нет`, `none`, or `cancel` cancel. The updater closes a running ATLAS only with
+accepts `Y` or Enter for approval and `no` (also `N`) to decline.
+In the package menu, Enter or `Y` selects package 1; a number selects another
+listed package and `no` cancels. The updater closes a running ATLAS only with
 confirmation, requests the container sudo password, installs the update, and
 restores capabilities.
 

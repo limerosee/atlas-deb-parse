@@ -212,7 +212,7 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
       printf '     SHA-256: %s\n' "${atlas_hashes[$index]}"
     done
     while true; do
-      printf 'Choose a package number and press Enter, or type N / no / нет / none to cancel: '
+      printf 'Install package 1? [Y/no; Enter = Y] Or enter another package number: '
       if ! IFS= read -r choice; then
         echo
         echo "Cancelled."
@@ -220,7 +220,10 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
       fi
       choice="${choice#"${choice%%[![:space:]]*}"}"
       choice="${choice%"${choice##*[![:space:]]}"}"
-      if [[ "${choice,,}" =~ ^(n|no|нет|none|cancel|отмена)$ ]]; then
+      if [[ -z "$choice" || "${choice,,}" == y ]]; then
+        choice=1
+      fi
+      if [[ "${choice,,}" == no || "${choice,,}" == n ]]; then
         echo "Cancelled."
         exit 0
       fi
@@ -231,7 +234,7 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
           break
         fi
       fi
-      echo "Please enter one of the listed numbers or N, then press Enter."
+      echo "Press Enter or type Y for package 1, a listed number for another package, or no to cancel."
     done
   fi
 

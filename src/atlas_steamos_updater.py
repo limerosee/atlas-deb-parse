@@ -217,14 +217,14 @@ def self_update(container: str) -> None:
 def prompt(question: str) -> bool:
     while True:
         try:
-            answer = input(f"{question} [1 = Yes / 2 = No; Y/N; да/нет] ").strip().lower()
+            answer = input(f"{question} [Y/no; Enter = Y] ").strip().lower()
         except EOFError:
             return False
-        if answer in {"y", "yes", "да", "1", "agree", "согласен", "согласна"}:
+        if answer in {"", "y"}:
             return True
-        if answer in {"n", "no", "нет", "2", "none", "cancel", "отмена"}:
+        if answer in {"n", "no"}:
             return False
-        print("Enter 1 / Y / yes / да to accept, or 2 / N / no / нет to decline, then press Enter.")
+        print("Press Enter or type Y to accept; type no to decline.")
 
 
 def version_key(value: str) -> tuple[tuple[int, object], ...]:

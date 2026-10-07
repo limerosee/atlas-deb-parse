@@ -221,16 +221,16 @@ class InstallerTests(unittest.TestCase):
             self.assertFalse(prompt("Continue?"))
 
     def test_prompt_repeats_until_y_or_n(self) -> None:
-        with mock.patch("builtins.input", side_effect=["", "unknown", "y"]):
+        with mock.patch("builtins.input", side_effect=["invalid", "unknown", "y"]):
             with mock.patch("builtins.print") as print_mock:
                 self.assertTrue(prompt("Continue?"))
         self.assertEqual(print_mock.call_count, 2)
 
-    def test_prompt_accepts_words_and_numbered_answers(self) -> None:
-        for answer in ("yes", "ДА", "1", " agree "):
+    def test_prompt_accepts_enter_y_and_no(self) -> None:
+        for answer in ("", "Y", " y "):
             with self.subTest(answer=answer), mock.patch("builtins.input", return_value=answer):
                 self.assertTrue(prompt("Continue?"))
-        for answer in ("no", "НЕТ", "2", "none", "отмена"):
+        for answer in ("no", "NO", "n"):
             with self.subTest(answer=answer), mock.patch("builtins.input", return_value=answer):
                 self.assertFalse(prompt("Continue?"))
 
