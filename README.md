@@ -165,7 +165,8 @@ cd "$HOME/atlas-steamos-updater"
 
 The script scans `Downloads` and its subdirectories (including folders such as
 `Telegram Desktop`), silently rejects unrelated packages, and lists every
-package that passes the ATLAS validator with its version and filename. Enter
+package that passes the ATLAS validator with its version, filename, and
+calculated SHA-256. Enter
 the displayed number and press **Enter**, or enter `N` and press **Enter** to
 cancel. The filename and safe version may differ, but the filename must end in
 `.deb`. The validator still requires package `atlas`, architecture `amd64`, and
@@ -173,6 +174,13 @@ the allow-listed payload. Symlinks are rejected. Bootstrap also refuses to
 replace an ATLAS binary already present in that container.
 If an ATLAS-named package is rejected, the scanner prints its exact validation
 error instead of hiding the reason.
+
+The menu is generated automatically: if four valid packages are found, it
+shows choices `1` through `4`. There is no hard-coded filename, version, or
+SHA-256 allowlist. The checksum is calculated from each file and displayed so
+the user can identify the exact package. Safety still comes from verifying the
+internal Debian metadata, `atlas` package identity, `amd64` architecture,
+per-file MD5 metadata, and the strict ATLAS payload allowlist.
 
 You can bypass the menu by explicitly supplying a package stored anywhere
 under your home directory:
@@ -199,6 +207,14 @@ switch the handler back to the real container:
 ```
 
 The container selection is preserved by later `./install.sh` runs.
+To keep a successfully tested container as the main ATLAS target, run the
+installer once with that container name, for example:
+
+```bash
+./install.sh --container atlas-updater-nettest --auto-update
+```
+
+This changes the updater target without deleting or renaming either Distrobox.
 
 ## Event log
 

@@ -140,6 +140,7 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
     fi
     atlas_candidates=()
     atlas_versions=()
+    atlas_hashes=()
     rejected_names=()
     rejected_reasons=()
     while IFS= read -r -d '' candidate; do
@@ -148,8 +149,11 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
         2>&1)"; then
         version="$(printf '%s' "$details" | python3 -c \
           'import json, sys; print(json.load(sys.stdin)["version"])')"
+        sha256="$(printf '%s' "$details" | python3 -c \
+          'import json, sys; print(json.load(sys.stdin)["sha256"])')"
         atlas_candidates+=("$candidate")
         atlas_versions+=("$version")
+        atlas_hashes+=("$sha256")
       elif [[ "${candidate##*/}" == *[Aa][Tt][Ll][Aa][Ss]* ]]; then
         rejected_names+=("${candidate##*/}")
         rejected_reasons+=("${details:-validator returned no details}")
@@ -175,6 +179,7 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
         "$((index + 1))" \
         "${atlas_versions[$index]}" \
         "${atlas_candidates[$index]##*/}"
+      printf '     SHA-256: %s\n' "${atlas_hashes[$index]}"
     done
     while true; do
       printf 'Choose a package number and press Enter, or type N to cancel: '

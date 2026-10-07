@@ -22,6 +22,7 @@ from atlas_steamos_updater import (
     configured_container,
     log_event,
     prompt,
+    reject_reinstall_or_downgrade,
     self_update,
     version_key,
 )
@@ -207,6 +208,45 @@ class InstallerTests(unittest.TestCase):
             info = inspect_package(package)
             self.assertEqual(info.package, "atlas")
             self.assertEqual(info.version, "1.20.3-r17")
+
+    def test_accepts_multiple_atlas_names_versions_and_checksums(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            variants = (
+                ("ATLAS-old.deb", "0.4.39-r1", b"old"),
+                ("telegram-download.deb", "0.5.1-r1", b"r1"),
+                ("ATLAS_0.5.1_r2_linux-x64.deb", "0.5.1-r2", b"r2"),
+                ("my-new-atlas.deb", "1.20.3-r17", b"new"),
+            )
+            results = []
+            for filename, version, binary in variants:
+                package = base / filename
+                files = dict(FILES)
+                files["usr/bin/atlas-preview"] = binary
+                make_deb(package, files, version=version)
+                results.append(inspect_package(package))
+
+            self.assertEqual(
+                [item.version for item in results],
+                [item[1] for item in variants],
+            )
+            self.assertEqual(len({item.sha256 for item in results}), 4)
+
+    def test_update_rejects_same_or_older_but_accepts_newer_version(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state_file = Path(directory) / "state.json"
+            state_file.write_text(
+                '{"installed_version": "0.5.1-r2", "installed_sha256": "old-hash"}'
+            )
+            with self.assertRaisesRegex(HandlerError, "reinstall or downgrade"):
+                reject_reinstall_or_downgrade(
+                    {"version": "0.5.1-r1", "sha256": "different-hash"},
+                    state_file,
+                )
+            reject_reinstall_or_downgrade(
+                {"version": "0.5.1-r3", "sha256": "new-hash"},
+                state_file,
+            )
 
     def test_rejects_wrong_package(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
