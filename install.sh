@@ -122,19 +122,32 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
     fi
     atlas_candidates=()
     atlas_versions=()
+    rejected_names=()
+    rejected_reasons=()
     while IFS= read -r -d '' candidate; do
       if details="$(distrobox enter "$container" -- \
         python3 "$libexec_dir/atlas_deb_installer.py" --inspect --json "$candidate" \
-        2>/dev/null)"; then
+        2>&1)"; then
         version="$(printf '%s' "$details" | python3 -c \
           'import json, sys; print(json.load(sys.stdin)["version"])')"
         atlas_candidates+=("$candidate")
         atlas_versions+=("$version")
+      elif [[ "${candidate##*/}" == *[Aa][Tt][Ll][Aa][Ss]* ]]; then
+        rejected_names+=("${candidate##*/}")
+        rejected_reasons+=("${details:-validator returned no details}")
       fi
     done < <(find "$downloads_dir" -type f -iname '*.deb' -print0 2>/dev/null | sort -z)
 
     if ((${#atlas_candidates[@]} == 0)); then
       echo "ERROR: no valid ATLAS .deb packages were found in $downloads_dir" >&2
+      if ((${#rejected_names[@]})); then
+        echo "ATLAS-named packages were rejected:" >&2
+        for index in "${!rejected_names[@]}"; do
+          printf '  - %s: %s\n' \
+            "${rejected_names[$index]}" \
+            "${rejected_reasons[$index]}" >&2
+        done
+      fi
       exit 2
     fi
 

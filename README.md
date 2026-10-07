@@ -162,6 +162,8 @@ cancel. The filename and safe version may differ, but the filename must end in
 `.deb`. The validator still requires package `atlas`, architecture `amd64`, and
 the allow-listed payload. Symlinks are rejected. Bootstrap also refuses to
 replace an ATLAS binary already present in that container.
+If an ATLAS-named package is rejected, the scanner prints its exact validation
+error instead of hiding the reason.
 
 You can bypass the menu by explicitly supplying a package stored anywhere
 under your home directory:
