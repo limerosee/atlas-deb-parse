@@ -54,31 +54,38 @@ ATLAS проверяет подписанный манифест обновле�
 
 ### Создание Distrobox
 
+В этой инструкции используется контейнер `atlas1`: передавайте установщику
+`--container atlas1`. Значение по умолчанию в скрипте остаётся `atlas`.
+Название приложения `ATLAS`, пакет `atlas`, параметр `--install-atlas`, URL
+репозитория и пути установки оставляйте без изменений. После пересоздания
+контейнера общий домашний каталог сохраняется: обновите существующий
+репозиторий вместо повторного клонирования.
+
 Сначала проверьте, существует ли уже нужный контейнер:
 
 ```bash
 distrobox list
 ```
 
-Если контейнера `atlas` в списке нет, создайте Fedora-контейнер на хосте
+Если контейнера `atlas1` в списке нет, создайте Fedora-контейнер на хосте
 SteamOS. Рекомендуемая команда также создаёт отдельное сетевое пространство
 имён, передаёт устройство TUN и capabilities, необходимые для проверки
 туннельного режима ATLAS:
 
 ```bash
-distrobox create --name atlas --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
+distrobox create --name atlas1 --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
 ```
 
 Один раз войдите в контейнер, чтобы Distrobox завершил первоначальную настройку:
 
 ```bash
-distrobox enter atlas
+distrobox enter atlas1
 ```
 
 Вернитесь в SteamOS командой `exit`, затем проверьте Fedora и устройство TUN:
 
 ```bash
-distrobox enter atlas -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun && echo "TUN device available"'
+distrobox enter atlas1 -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun && echo "TUN device available"'
 ```
 
 Не запускайте `distrobox create` повторно с уже существующим именем. Если старый
@@ -91,7 +98,7 @@ distrobox enter atlas -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun &
 Сначала установите зависимости контейнера:
 
 ```bash
-distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
+distrobox enter atlas1 -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 ### Первая установка: клонирование
@@ -100,7 +107,7 @@ distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap gtk3 webki
 нет:
 
 ```bash
-distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+distrobox enter atlas1 -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
 ```
 
 По умолчанию Distrobox использует общий со SteamOS домашний каталог, поэтому
@@ -112,7 +119,7 @@ distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.
 `git clone`:
 
 ```bash
-distrobox enter atlas -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
+distrobox enter atlas1 -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
 ```
 
 Параметр `--ff-only` защищает локальную работу: Git откажется перезаписывать
@@ -126,7 +133,7 @@ distrobox enter atlas -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
 
 ```bash
 mv "$HOME/atlas-steamos-updater" "$HOME/atlas-steamos-updater.backup-$(date +%Y%m%d-%H%M%S)"
-distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+distrobox enter atlas1 -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
 ```
 
 ### Установка или обновление интеграции на хосте
@@ -137,7 +144,7 @@ distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --container atlas --auto-update
+./install.sh --container atlas1 --auto-update
 ```
 
 Не запускайте `install.sh` внутри контейнера: он регистрирует MIME-обработчик на
@@ -182,7 +189,7 @@ ATLAS?`. Простое открытие пакета не запускает с
 установки ATLAS:
 
 ```bash
-./install.sh --container atlas --install-dependencies
+./install.sh --container atlas1 --install-dependencies
 ```
 
 Установщик сохраняет предыдущий обработчик MIME для `.deb` и назначает
@@ -207,8 +214,8 @@ like to open ATLAS now? [Y/N]`; ответ `Y` немедленно запуск
 Создайте отдельный Fedora-контейнер на хосте SteamOS:
 
 ```bash
-distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
-distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
+distrobox create --name atlas1-test --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
+distrobox enter atlas1-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 Отдельное сетевое пространство имён и дополнительные runtime-флаги нужны,
@@ -221,7 +228,7 @@ distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libc
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --container atlas-updater-test --auto-update --install-atlas
+./install.sh --container atlas1-test --auto-update --install-atlas
 ```
 
 Скрипт рекурсивно сканирует каталог `Downloads` и его подкаталоги, включая
@@ -247,13 +254,13 @@ SHA-256 нет. Контрольная сумма вычисляется для 
 каталога:
 
 ```bash
-./install.sh --container atlas-updater-test --auto-update --install-atlas "$HOME/Downloads/your-atlas-package.deb"
+./install.sh --container atlas1-test --auto-update --install-atlas "$HOME/Downloads/your-atlas-package.deb"
 ```
 
 После успешной начальной установки запустите тестовую копию напрямую:
 
 ```bash
-distrobox enter atlas-updater-test -- /usr/bin/atlas-preview
+distrobox enter atlas1-test -- /usr/bin/atlas-preview
 ```
 
 Последующие обновления ATLAS используют обычный MIME-обработчик и запрос
@@ -261,7 +268,7 @@ distrobox enter atlas-updater-test -- /usr/bin/atlas-preview
 state-файл. После проверки верните обработчик на рабочий контейнер:
 
 ```bash
-./install.sh --container atlas --auto-update
+./install.sh --container atlas1 --auto-update
 ```
 
 Выбор контейнера сохраняется при следующих запусках `./install.sh`.
@@ -269,7 +276,7 @@ state-файл. После проверки верните обработчик 
 запустите установщик с его именем, например:
 
 ```bash
-./install.sh --container atlas-updater-nettest --auto-update
+./install.sh --container atlas1 --auto-update
 ```
 
 Это переключает цель updater без удаления или переименования Distrobox.
@@ -285,12 +292,12 @@ ATLAS, но не изменяет алгоритм выбора подключе
 Диагностика, которую безопасно публиковать после проверки результата:
 
 ```bash
-distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-preview
-distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-network
-distrobox enter atlas-updater-nettest -- pgrep -a -x sing-box-awg
-distrobox enter atlas-updater-nettest -- getcap /usr/lib/ATLAS/resources/atlas-network /usr/lib/ATLAS/resources/sing-box-awg
-distrobox enter atlas-updater-nettest -- ip -6 route show default
-distrobox enter atlas-updater-nettest -- curl -6 --connect-timeout 10 -I https://example.com
+distrobox enter atlas1 -- pgrep -a -x atlas-preview
+distrobox enter atlas1 -- pgrep -a -x atlas-network
+distrobox enter atlas1 -- pgrep -a -x sing-box-awg
+distrobox enter atlas1 -- getcap /usr/lib/ATLAS/resources/atlas-network /usr/lib/ATLAS/resources/sing-box-awg
+distrobox enter atlas1 -- ip -6 route show default
+distrobox enter atlas1 -- curl -6 --connect-timeout 10 -I https://example.com
 ```
 
 Для обоих сетевых компонентов ожидаются capabilities

@@ -50,30 +50,36 @@ metadata, payload allow-listing, hashes, and user confirmation.
 
 ### Create the Distrobox
 
+This guide uses container `atlas1`; always pass `--container atlas1` to the
+installer. The script's fallback default remains `atlas`. Keep the application
+name `ATLAS`, Debian package `atlas`, option `--install-atlas`, repository URL,
+and installation paths unchanged. Recreating a container preserves the shared
+home directory, so update the existing checkout instead of cloning it again.
+
 Check whether the target container already exists:
 
 ```bash
 distrobox list
 ```
 
-If `atlas` is not listed, create a Fedora container on the SteamOS host. This
+If `atlas1` is not listed, create a Fedora container on the SteamOS host. This
 recommended form also prepares an isolated network namespace, the TUN device,
 and the capabilities needed to test ATLAS tunnel mode:
 
 ```bash
-distrobox create --name atlas --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
+distrobox create --name atlas1 --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
 ```
 
 Enter it once so Distrobox can finish its initial setup:
 
 ```bash
-distrobox enter atlas
+distrobox enter atlas1
 ```
 
 Exit back to SteamOS with `exit`, then verify Fedora and the TUN device:
 
 ```bash
-distrobox enter atlas -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun && echo "TUN device available"'
+distrobox enter atlas1 -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun && echo "TUN device available"'
 ```
 
 Do not run `distrobox create` again for an existing name. If an old container
@@ -86,7 +92,7 @@ do not automatically appear in another container.
 Install the container dependencies first:
 
 ```bash
-distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
+distrobox enter atlas1 -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 ### First installation: clone
@@ -94,7 +100,7 @@ distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap gtk3 webki
 Run this only when `$HOME/atlas-steamos-updater` does not already exist:
 
 ```bash
-distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+distrobox enter atlas1 -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
 ```
 
 Distrobox shares the home directory with SteamOS by default, so the cloned
@@ -106,7 +112,7 @@ If the directory already exists, update it instead of running `git clone`
 again:
 
 ```bash
-distrobox enter atlas -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
+distrobox enter atlas1 -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
 ```
 
 `--ff-only` protects local work by refusing to overwrite divergent commits or
@@ -120,7 +126,7 @@ SteamOS host:
 
 ```bash
 mv "$HOME/atlas-steamos-updater" "$HOME/atlas-steamos-updater.backup-$(date +%Y%m%d-%H%M%S)"
-distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+distrobox enter atlas1 -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
 ```
 
 ### Install or refresh the host integration
@@ -131,7 +137,7 @@ updater scripts with the current repository version:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --container atlas --auto-update
+./install.sh --container atlas1 --auto-update
 ```
 
 Do not run `install.sh` inside the container: it registers the host-side MIME
@@ -173,7 +179,7 @@ Fedora runtime equivalents of ATLAS's Debian dependencies. To install or repair
 only these dependencies in an existing container without reinstalling ATLAS:
 
 ```bash
-./install.sh --container atlas --install-dependencies
+./install.sh --container atlas1 --install-dependencies
 ```
 
 The installer records the previous `.deb` MIME handler and makes
@@ -199,8 +205,8 @@ Packages outside ATLAS's own update directory are rejected.
 Create a separate Fedora container on the SteamOS host:
 
 ```bash
-distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
-distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
+distrobox create --name atlas1-test --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
+distrobox enter atlas1-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
 
 The isolated network namespace and runtime flags are required only when this
@@ -213,7 +219,7 @@ the interactive bootstrap:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --container atlas-updater-test --auto-update --install-atlas
+./install.sh --container atlas1-test --auto-update --install-atlas
 ```
 
 The script scans `Downloads` and its subdirectories (including folders such as
@@ -239,13 +245,13 @@ You can bypass the menu by explicitly supplying a package stored anywhere
 under your home directory:
 
 ```bash
-./install.sh --container atlas-updater-test --auto-update --install-atlas "$HOME/Downloads/your-atlas-package.deb"
+./install.sh --container atlas1-test --auto-update --install-atlas "$HOME/Downloads/your-atlas-package.deb"
 ```
 
 After a successful bootstrap, launch the test copy directly:
 
 ```bash
-distrobox enter atlas-updater-test -- /usr/bin/atlas-preview
+distrobox enter atlas1-test -- /usr/bin/atlas-preview
 ```
 
 Later ATLAS updates use the normal MIME handler and confirmation flow. State
@@ -253,7 +259,7 @@ files are separate for each configured container. When testing is finished,
 switch the handler back to the real container:
 
 ```bash
-./install.sh --container atlas --auto-update
+./install.sh --container atlas1 --auto-update
 ```
 
 The container selection is preserved by later `./install.sh` runs.
@@ -261,7 +267,7 @@ To keep a successfully tested container as the main ATLAS target, run the
 installer once with that container name, for example:
 
 ```bash
-./install.sh --container atlas-updater-nettest --auto-update
+./install.sh --container atlas1 --auto-update
 ```
 
 This changes the updater target without deleting or renaming either Distrobox.
@@ -277,12 +283,12 @@ installation failed.
 A useful privacy-safe diagnosis is:
 
 ```bash
-distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-preview
-distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-network
-distrobox enter atlas-updater-nettest -- pgrep -a -x sing-box-awg
-distrobox enter atlas-updater-nettest -- getcap /usr/lib/ATLAS/resources/atlas-network /usr/lib/ATLAS/resources/sing-box-awg
-distrobox enter atlas-updater-nettest -- ip -6 route show default
-distrobox enter atlas-updater-nettest -- curl -6 --connect-timeout 10 -I https://example.com
+distrobox enter atlas1 -- pgrep -a -x atlas-preview
+distrobox enter atlas1 -- pgrep -a -x atlas-network
+distrobox enter atlas1 -- pgrep -a -x sing-box-awg
+distrobox enter atlas1 -- getcap /usr/lib/ATLAS/resources/atlas-network /usr/lib/ATLAS/resources/sing-box-awg
+distrobox enter atlas1 -- ip -6 route show default
+distrobox enter atlas1 -- curl -6 --connect-timeout 10 -I https://example.com
 ```
 
 Expected capabilities are `cap_net_admin,cap_net_raw=ep` on both network
