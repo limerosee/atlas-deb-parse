@@ -122,11 +122,7 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
     fi
     atlas_candidates=()
     atlas_versions=()
-    shopt -s nullglob nocaseglob
-    for candidate in "$downloads_dir"/*.deb; do
-      if [[ -L "$candidate" || ! -f "$candidate" ]]; then
-        continue
-      fi
+    while IFS= read -r -d '' candidate; do
       if details="$(distrobox enter "$container" -- \
         python3 "$libexec_dir/atlas_deb_installer.py" --inspect --json "$candidate" \
         2>/dev/null)"; then
@@ -135,8 +131,7 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
         atlas_candidates+=("$candidate")
         atlas_versions+=("$version")
       fi
-    done
-    shopt -u nullglob nocaseglob
+    done < <(find "$downloads_dir" -type f -iname '*.deb' -print0 2>/dev/null | sort -z)
 
     if ((${#atlas_candidates[@]} == 0)); then
       echo "ERROR: no valid ATLAS .deb packages were found in $downloads_dir" >&2

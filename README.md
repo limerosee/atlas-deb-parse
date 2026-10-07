@@ -154,14 +154,14 @@ cd "$HOME/atlas-steamos-updater"
   --install-atlas
 ```
 
-The script scans only the top level of `Downloads`, silently rejects unrelated
-packages, and lists every package that passes the ATLAS validator with its
-version and filename. Enter the displayed number and press **Enter**, or enter
-`N` and press **Enter** to cancel. The filename and safe version may differ,
-but the filename must end in `.deb`. The validator still requires package
-`atlas`, architecture `amd64`, and the allow-listed payload. Symlinks are
-rejected. Bootstrap also refuses to replace an ATLAS binary already present in
-that container.
+The script scans `Downloads` and its subdirectories (including folders such as
+`Telegram Desktop`), silently rejects unrelated packages, and lists every
+package that passes the ATLAS validator with its version and filename. Enter
+the displayed number and press **Enter**, or enter `N` and press **Enter** to
+cancel. The filename and safe version may differ, but the filename must end in
+`.deb`. The validator still requires package `atlas`, architecture `amd64`, and
+the allow-listed payload. Symlinks are rejected. Bootstrap also refuses to
+replace an ATLAS binary already present in that container.
 
 You can bypass the menu by explicitly supplying a package stored anywhere
 under your home directory:
