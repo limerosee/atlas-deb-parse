@@ -48,6 +48,41 @@ metadata, payload allow-listing, hashes, and user confirmation.
 
 ## Install
 
+### Create the Distrobox
+
+Check whether the target container already exists:
+
+```bash
+distrobox list
+```
+
+If `atlas` is not listed, create a Fedora container on the SteamOS host. This
+recommended form also prepares an isolated network namespace, the TUN device,
+and the capabilities needed to test ATLAS tunnel mode:
+
+```bash
+distrobox create --name atlas --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
+```
+
+Enter it once so Distrobox can finish its initial setup:
+
+```bash
+distrobox enter atlas
+```
+
+Exit back to SteamOS with `exit`, then verify Fedora and the TUN device:
+
+```bash
+distrobox enter atlas -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun && echo "TUN device available"'
+```
+
+Do not run `distrobox create` again for an existing name. If an old container
+was created without the required network flags, create a new one under another
+name such as `atlas-new`, then consistently pass
+`--container atlas-new` to `install.sh`. Distrobox shares the user's home
+directory by default, but packages and programs installed inside one container
+do not automatically appear in another container.
+
 Install the container dependencies first:
 
 ```bash

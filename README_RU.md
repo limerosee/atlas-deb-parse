@@ -52,6 +52,42 @@ ATLAS проверяет подписанный манифест обновле�
 
 ## Установка
 
+### Создание Distrobox
+
+Сначала проверьте, существует ли уже нужный контейнер:
+
+```bash
+distrobox list
+```
+
+Если контейнера `atlas` в списке нет, создайте Fedora-контейнер на хосте
+SteamOS. Рекомендуемая команда также создаёт отдельное сетевое пространство
+имён, передаёт устройство TUN и capabilities, необходимые для проверки
+туннельного режима ATLAS:
+
+```bash
+distrobox create --name atlas --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
+```
+
+Один раз войдите в контейнер, чтобы Distrobox завершил первоначальную настройку:
+
+```bash
+distrobox enter atlas
+```
+
+Вернитесь в SteamOS командой `exit`, затем проверьте Fedora и устройство TUN:
+
+```bash
+distrobox enter atlas -- sh -lc 'cat /etc/fedora-release; test -c /dev/net/tun && echo "TUN device available"'
+```
+
+Не запускайте `distrobox create` повторно с уже существующим именем. Если старый
+контейнер был создан без нужных сетевых флагов, создайте новый, например
+`atlas-new`, и далее везде передавайте установщику
+`--container atlas-new`. По умолчанию Distrobox предоставляет контейнерам общий
+домашний каталог пользователя, но пакеты и программы, установленные внутри
+одного контейнера, автоматически не появляются в другом.
+
 Сначала установите зависимости контейнера:
 
 ```bash
