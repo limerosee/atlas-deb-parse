@@ -328,7 +328,7 @@ def main() -> int:
                 print("Continuing with the currently installed updater.")
 
         process_check = run_in_container(
-            ["pgrep", "-x", "atlas-preview"],
+            ["pgrep", "-x", "atlas-preview|atlas"],
             container=container,
             capture=True,
         )
@@ -336,7 +336,7 @@ def main() -> int:
             if not prompt("ATLAS is running. Would you like to close it before updating?"):
                 raise HandlerError("ATLAS must be closed before installation")
             stop_result = run_in_container(
-                ["pkill", "-TERM", "-x", "atlas-preview"],
+                ["pkill", "-TERM", "-x", "atlas-preview|atlas"],
                 container=container,
             )
             if stop_result.returncode not in {0, 1}:
@@ -361,8 +361,13 @@ def main() -> int:
 
         relaunched = False
         if not args.no_relaunch and prompt("Would you like to open ATLAS now?"):
+            executable = (
+                "/usr/bin/atlas-preview"
+                if "usr/bin/atlas-preview" in details["files"]
+                else "/usr/bin/atlas"
+            )
             subprocess.Popen(
-                ["distrobox", "enter", container, "--", "/usr/bin/atlas-preview"],
+                ["distrobox", "enter", container, "--", executable],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,

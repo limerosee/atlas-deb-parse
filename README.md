@@ -268,6 +268,15 @@ This changes the updater target without deleting or renaming either Distrobox.
 
 ## ATLAS connection troubleshooting
 
+Packages may contain either `/usr/bin/atlas` (older releases) or
+`/usr/bin/atlas-preview`. Both names and their corresponding PNG icons are
+accepted; an update relaunches the executable included in that package.
+For either version, launch with:
+
+```bash
+distrobox enter atlas -- sh -c 'if test -x /usr/bin/atlas-preview; then exec /usr/bin/atlas-preview; else exec /usr/bin/atlas; fi'
+```
+
 The installer can validate, install, back up, and update ATLAS files, but it
 does not modify ATLAS's connection-selection logic or generated tunnel
 configuration. A message equivalent to `Could not select working connection

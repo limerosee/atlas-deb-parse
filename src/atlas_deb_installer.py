@@ -31,21 +31,21 @@ AR_MAGIC = b"!<arch>\n"
 MAX_PACKAGE_SIZE = 512 * 1024 * 1024
 MAX_PAYLOAD_SIZE = 300 * 1024 * 1024
 REQUIRED_FILES = {
-    "usr/bin/atlas-preview",
     "usr/lib/ATLAS/resources/atlas-network",
     "usr/lib/ATLAS/resources/sing-box-awg",
     "usr/share/applications/ATLAS.desktop",
 }
+APP_BINARIES = {"usr/bin/atlas", "usr/bin/atlas-preview"}
 CAPABILITY_FILES = (
     "usr/lib/ATLAS/resources/sing-box-awg",
     "usr/lib/ATLAS/resources/atlas-network",
 )
 ALLOWED_FILE_PATTERNS = (
-    re.compile(r"usr/bin/atlas-preview\Z"),
+    re.compile(r"usr/bin/(?:atlas|atlas-preview)\Z"),
     re.compile(r"usr/lib/ATLAS/resources/(?:atlas-network|sing-box-awg)\Z"),
     re.compile(r"usr/share/applications/ATLAS\.desktop\Z"),
     re.compile(
-        r"usr/share/icons/hicolor/[A-Za-z0-9_.@+-]+/apps/atlas-preview\.png\Z"
+        r"usr/share/icons/hicolor/[A-Za-z0-9_.@+-]+/apps/(?:atlas|atlas-preview)\.png\Z"
     ),
 )
 VERSION_RE = re.compile(r"[0-9][0-9A-Za-z.+:~_-]*\Z")
@@ -295,6 +295,8 @@ def read_payload(tar_bytes: bytes, expected_md5: dict[str, str]) -> tuple[Payloa
         extra = sorted(set(expected_md5) - seen)
         raise PackageError(f"md5sums lists files absent from payload: {extra}")
     missing = REQUIRED_FILES - seen
+    if not seen & APP_BINARIES:
+        raise PackageError("required ATLAS executable is missing: atlas or atlas-preview")
     if missing:
         raise PackageError(f"required ATLAS files are missing: {sorted(missing)}")
     return tuple(sorted(files, key=lambda item: item.path))
@@ -466,7 +468,7 @@ def install_package(
     try:
         install_files(info, root)
         capabilities = restore_capabilities(root)
-        for required in REQUIRED_FILES:
+        for required in REQUIRED_FILES | (APP_BINARIES & {item.path for item in info.files}):
             installed = target_path(root, required)
             if not installed.is_file() or installed.is_symlink():
                 raise PackageError(f"post-install verification failed: {installed}")

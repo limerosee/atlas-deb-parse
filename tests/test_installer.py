@@ -44,7 +44,7 @@ def tar_gz(files: dict[str, bytes], *, symlink: str | None = None) -> bytes:
     with tarfile.open(fileobj=raw, mode="w") as archive:
         for name, data in files.items():
             member = tarfile.TarInfo(f"./{name}")
-            member.mode = 0o755 if name.endswith(("atlas-preview", "atlas-network", "sing-box-awg")) else 0o644
+            member.mode = 0o755 if name.endswith(("atlas", "atlas-preview", "atlas-network", "sing-box-awg")) else 0o644
             member.size = len(data)
             archive.addfile(member, io.BytesIO(data))
         if symlink:
@@ -99,6 +99,31 @@ def make_deb(
 
 
 class InstallerTests(unittest.TestCase):
+    def test_legacy_atlas_binary_installs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            base = Path(directory)
+            files = dict(FILES)
+            files["usr/bin/atlas"] = files.pop("usr/bin/atlas-preview")
+            files["usr/share/icons/hicolor/32x32/apps/atlas.png"] = files.pop(
+                "usr/share/icons/hicolor/32x32/apps/atlas-preview.png"
+            )
+            package = base / "legacy.deb"
+            make_deb(package, files, version="0.4.39-r1")
+            info = inspect_package(package)
+            root = base / "root"
+            root.mkdir()
+            install_package(info, root, base / "backups", None)
+            self.assertTrue((root / "usr/bin/atlas").is_file())
+
+    def test_rejects_package_without_either_atlas_binary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            files = dict(FILES)
+            del files["usr/bin/atlas-preview"]
+            package = Path(directory) / "missing.deb"
+            make_deb(package, files)
+            with self.assertRaisesRegex(PackageError, "executable is missing"):
+                inspect_package(package)
+
     def test_install_help_does_not_require_writable_home(self) -> None:
         script = Path(__file__).resolve().parents[1] / "install.sh"
         result = subprocess.run(

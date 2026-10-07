@@ -142,7 +142,7 @@ if [[ "$install_dependencies" == true ]]; then
 fi
 
 if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
-  if distrobox enter "$container" -- test -e /usr/bin/atlas-preview; then
+  if distrobox enter "$container" -- sh -c 'test -e /usr/bin/atlas-preview || test -e /usr/bin/atlas'; then
     echo "ERROR: ATLAS is already installed in Distrobox '$container'; use the normal updater" >&2
     exit 2
   fi
