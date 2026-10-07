@@ -1,6 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-dependencies] [--install-atlas [PACKAGE.deb]]"
+}
+
+# Help must be safe even when the user's home directory is unavailable or
+# read-only.  Do not create state directories before handling it.
+for argument in "$@"; do
+  case "$argument" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+  esac
+done
+
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 bin_dir="$HOME/.local/bin"
 libexec_dir="$HOME/.local/libexec/atlas-steamos-updater"
@@ -54,7 +69,7 @@ while (($#)); do
       shift
       ;;
     -h|--help)
-      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-dependencies] [--install-atlas [PACKAGE.deb]]"
+      usage
       exit 0
       ;;
     *)

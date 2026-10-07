@@ -4,8 +4,8 @@
 
 Специализированный помощник для установки обновлений ATLAS в SteamOS. Он
 перехватывает открываемое ATLAS обновление в формате `.deb`, проверяет пакет и
-устанавливает только разрешённые файлы в существующий Fedora Distrobox с именем
-`atlas`.
+устанавливает только разрешённые файлы в выбранный Fedora Distrobox (`atlas`
+используется по умолчанию).
 
 Он **не изменяет** доступную только для чтения файловую систему SteamOS и не
 исправляет и не заменяет код обновления ATLAS.
@@ -43,17 +43,12 @@ ATLAS проверяет подписанный манифест обновле�
 ## Требования
 
 - SteamOS в режиме рабочего стола
-- Distrobox-контейнер с именем `atlas`
+- Fedora Distrobox-контейнер (`atlas` — имя по умолчанию; другой контейнер
+  выбирается параметром `--container`)
 - Python 3 на хосте и в контейнере
-- Fedora-пакеты `binutils`, `zstd`, `libcap`, `gtk3`, `webkit2gtk4.1` и
+- Fedora-пакеты `git`, `binutils`, `zstd`, `libcap`, `gtk3`, `webkit2gtk4.1` и
   `libayatana-appindicator-gtk3` в контейнере
 - `xdg-mime` на хосте
-
-Внутри контейнера выполните:
-
-```bash
-sudo dnf install -y binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
-```
 
 ## Установка
 
@@ -106,7 +101,7 @@ distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --auto-update
+./install.sh --container atlas --auto-update
 ```
 
 Не запускайте `install.sh` внутри контейнера: он регистрирует MIME-обработчик на
@@ -128,6 +123,23 @@ ATLAS?`. Простое открытие пакета не запускает с
 Выбранная настройка сохраняется при следующих запусках `./install.sh`, пока вы
 снова не передадите один из этих параметров.
 
+Параметры установщика решают разные задачи:
+
+- `--container NAME` выбирает и запоминает Distrobox для ATLAS;
+- `--install-atlas` выполняет начальную установку ATLAS и без следующего пути
+  открывает нумерованное меню пакетов;
+- `--install-dependencies` восстанавливает только зависимости Fedora;
+- `--auto-update` разрешает обновлять этот updater/parser после согласия
+  пользователя на обновление ATLAS, но никогда не устанавливает пакет ATLAS
+  без подтверждения;
+- `--no-auto-update` отключает только самообновление updater/parser.
+
+Краткую справку можно вывести без изменения установки:
+
+```bash
+./install.sh --help
+```
+
 При начальной установке параметр `--install-atlas` автоматически устанавливает
 известные Fedora-эквиваленты Debian-зависимостей ATLAS. Чтобы установить или
 восстановить только эти зависимости в существующем контейнере без повторной
@@ -148,6 +160,10 @@ like to open ATLAS now? [Y/N]`; ответ `Y` немедленно запуск
 только после подтверждения, запрашивает пароль `sudo` контейнера, устанавливает
 обновление и восстанавливает capabilities.
 
+Обычный процесс обновления отклоняет уже установленный SHA-256, а также версию,
+которая равна записанной для контейнера или ниже неё. Это не относится к
+начальной установке: её меню не содержит жёсткого списка версий или SHA-256.
+
 Пакеты вне собственного каталога обновлений ATLAS отклоняются.
 
 ## Проверка в отдельном Distrobox
@@ -155,19 +171,21 @@ like to open ATLAS now? [Y/N]`; ответ `Y` немедленно запуск
 Создайте отдельный Fedora-контейнер на хосте SteamOS:
 
 ```bash
-distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest
+distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
 distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
+
+Отдельное сетевое пространство имён и дополнительные runtime-флаги нужны,
+только если в этом контейнере также проверяется режим туннеля ATLAS; такая
+проверка остаётся изолированной от сети хоста. Сама проверка установки и
+обновления пакетов туннель не создаёт.
 
 Поместите один или несколько Debian-пакетов ATLAS непосредственно в
 `$HOME/Downloads`, затем запустите интерактивную начальную установку:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh \
-  --container atlas-updater-test \
-  --auto-update \
-  --install-atlas
+./install.sh --container atlas-updater-test --auto-update --install-atlas
 ```
 
 Скрипт рекурсивно сканирует каталог `Downloads` и его подкаталоги, включая
@@ -193,10 +211,7 @@ SHA-256 нет. Контрольная сумма вычисляется для 
 каталога:
 
 ```bash
-./install.sh \
-  --container atlas-updater-test \
-  --auto-update \
-  --install-atlas "$HOME/Downloads/your-atlas-package.deb"
+./install.sh --container atlas-updater-test --auto-update --install-atlas "$HOME/Downloads/your-atlas-package.deb"
 ```
 
 После успешной начальной установки запустите тестовую копию напрямую:
@@ -222,6 +237,45 @@ state-файл. После проверки верните обработчик 
 ```
 
 Это переключает цель updater без удаления или переименования Distrobox.
+
+## Диагностика подключения ATLAS
+
+Установщик умеет проверять, устанавливать, резервировать и обновлять файлы
+ATLAS, но не изменяет алгоритм выбора подключения или создаваемую ATLAS
+конфигурацию туннеля. Сообщение `Не удалось подобрать рабочие параметры
+подключения` относится к работе ATLAS или сети и само по себе не означает, что
+пакет был установлен неправильно.
+
+Диагностика, которую безопасно публиковать после проверки результата:
+
+```bash
+distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-preview
+distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-network
+distrobox enter atlas-updater-nettest -- pgrep -a -x sing-box-awg
+distrobox enter atlas-updater-nettest -- getcap /usr/lib/ATLAS/resources/atlas-network /usr/lib/ATLAS/resources/sing-box-awg
+distrobox enter atlas-updater-nettest -- ip -6 route show default
+distrobox enter atlas-updater-nettest -- curl -6 --connect-timeout 10 -I https://example.com
+```
+
+Для обоих сетевых компонентов ожидаются capabilities
+`cap_net_admin,cap_net_raw=ep`. Если `atlas-network` ненадолго становится
+zombie с кодом завершения ноль, проверка закончилась штатно, а не аварийно.
+Если `sing-box-awg` и TUN-интерфейс не появляются, ATLAS отклонил все
+проверенные варианты до запуска туннеля. Причиной могут быть отсутствие
+рабочего IPv6, блокировка транспорта, текущая сеть Wi-Fi или маршрутизатор,
+провайдер либо недоступные удалённые узлы. Проверка в другой сети с рабочим
+IPv6 помогает отделить проблему устройства от проблемы сети.
+
+Предупреждение sing-box 1.15 об устаревшем параметре TUN `stack` — отдельная
+проблема: в версии 1.15 параметр ещё работает, но запланирован к удалению в
+1.17. В будущем ATLAS должен изменить создаваемую конфигурацию. Не редактируйте
+runtime JSON как исправление установщика: ATLAS может перезаписать файл.
+
+Перед публикацией диагностики удалите повторяющиеся строки и скройте публичные
+IP-адреса, имена серверов, идентификаторы аккаунта, ссылки доступа, токены и
+данные подписки. Никогда не публикуйте `account.json`, cookies, полные runtime
+конфигурации и другие учётные данные. Обычно достаточно имён процессов, кода
+завершения, вывода capabilities и короткого текста ошибки.
 
 ## Журнал событий
 
@@ -263,6 +317,9 @@ tail -n 50 "$HOME/.local/state/atlas-steamos-updater/events.log"
 ```text
 ~/.local/state/atlas-steamos-updater/atlas.json
 ```
+
+Для контейнера с другим именем state-файл называется
+`atlas-<имя-контейнера>.json`.
 
 ## Удаление
 

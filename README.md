@@ -4,7 +4,7 @@
 
 A purpose-built update compatibility helper for ATLAS on SteamOS. It catches
 the `.deb` update opened by ATLAS, validates the package, and installs its
-allow-listed payload inside the existing Fedora Distrobox named `atlas`.
+allow-listed payload inside a selected Fedora Distrobox (`atlas` by default).
 
 It does **not** modify SteamOS's read-only filesystem and does not patch or
 replace ATLAS's updater code.
@@ -39,17 +39,12 @@ metadata, payload allow-listing, hashes, and user confirmation.
 ## Requirements
 
 - SteamOS Desktop Mode
-- Distrobox container named `atlas`
+- Fedora Distrobox container (`atlas` is the default name; `--container`
+  selects another one)
 - Python 3 in the host and container
-- Fedora packages `binutils`, `zstd`, `libcap`, `gtk3`, `webkit2gtk4.1`, and
-  `libayatana-appindicator-gtk3` in the container
+- Fedora packages `git`, `binutils`, `zstd`, `libcap`, `gtk3`,
+  `webkit2gtk4.1`, and `libayatana-appindicator-gtk3` in the container
 - `xdg-mime` on the host
-
-Inside the container:
-
-```bash
-sudo dnf install -y binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
-```
 
 ## Install
 
@@ -101,7 +96,7 @@ updater scripts with the current repository version:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh --auto-update
+./install.sh --container atlas --auto-update
 ```
 
 Do not run `install.sh` inside the container: it registers the host-side MIME
@@ -122,6 +117,22 @@ To disable this behavior while keeping the regular updater installed:
 The selected setting is preserved by later `./install.sh` runs unless you pass
 one of these options again.
 
+The installer options have separate purposes:
+
+- `--container NAME` selects and remembers the Distrobox used by ATLAS;
+- `--install-atlas` performs the initial ATLAS bootstrap and opens the numbered
+  package chooser when no path follows it;
+- `--install-dependencies` repairs only the Fedora runtime dependencies;
+- `--auto-update` enables updating this updater/parser after the user accepts
+  an ATLAS update; it never silently installs an ATLAS package;
+- `--no-auto-update` disables only that updater/parser self-update.
+
+Display the command summary without changing the installation:
+
+```bash
+./install.sh --help
+```
+
 Initial bootstrap with `--install-atlas` automatically installs the known
 Fedora runtime equivalents of ATLAS's Debian dependencies. To install or repair
 only these dependencies in an existing container without reinstalling ATLAS:
@@ -141,6 +152,11 @@ requires an explicit `Y` or `N`. The updater closes a running ATLAS only with
 confirmation, requests the container sudo password, installs the update, and
 restores capabilities.
 
+The regular update flow refuses the same SHA-256 and refuses a version that is
+equal to or older than the version recorded for that container. This is
+separate from initial bootstrap, whose package chooser has no hard-coded
+version or checksum allowlist.
+
 Packages outside ATLAS's own update directory are rejected.
 
 ## Test in a separate Distrobox
@@ -148,19 +164,21 @@ Packages outside ATLAS's own update directory are rejected.
 Create a separate Fedora container on the SteamOS host:
 
 ```bash
-distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest
+distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fedora:latest --unshare-netns --additional-flags "--cap-add=NET_ADMIN --cap-add=NET_RAW --device=/dev/net/tun"
 distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap gtk3 webkit2gtk4.1 libayatana-appindicator-gtk3
 ```
+
+The isolated network namespace and runtime flags are required only when this
+container will also test ATLAS tunnel mode; they keep that test separate from
+the host network. Package installation/update testing does not itself create a
+tunnel.
 
 Place one or more ATLAS Debian packages directly in `$HOME/Downloads`, then run
 the interactive bootstrap:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
-./install.sh \
-  --container atlas-updater-test \
-  --auto-update \
-  --install-atlas
+./install.sh --container atlas-updater-test --auto-update --install-atlas
 ```
 
 The script scans `Downloads` and its subdirectories (including folders such as
@@ -186,10 +204,7 @@ You can bypass the menu by explicitly supplying a package stored anywhere
 under your home directory:
 
 ```bash
-./install.sh \
-  --container atlas-updater-test \
-  --auto-update \
-  --install-atlas "$HOME/Downloads/your-atlas-package.deb"
+./install.sh --container atlas-updater-test --auto-update --install-atlas "$HOME/Downloads/your-atlas-package.deb"
 ```
 
 After a successful bootstrap, launch the test copy directly:
@@ -215,6 +230,44 @@ installer once with that container name, for example:
 ```
 
 This changes the updater target without deleting or renaming either Distrobox.
+
+## ATLAS connection troubleshooting
+
+The installer can validate, install, back up, and update ATLAS files, but it
+does not modify ATLAS's connection-selection logic or generated tunnel
+configuration. A message equivalent to `Could not select working connection
+parameters` is an ATLAS runtime/network error, not evidence that package
+installation failed.
+
+A useful privacy-safe diagnosis is:
+
+```bash
+distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-preview
+distrobox enter atlas-updater-nettest -- pgrep -a -x atlas-network
+distrobox enter atlas-updater-nettest -- pgrep -a -x sing-box-awg
+distrobox enter atlas-updater-nettest -- getcap /usr/lib/ATLAS/resources/atlas-network /usr/lib/ATLAS/resources/sing-box-awg
+distrobox enter atlas-updater-nettest -- ip -6 route show default
+distrobox enter atlas-updater-nettest -- curl -6 --connect-timeout 10 -I https://example.com
+```
+
+Expected capabilities are `cap_net_admin,cap_net_raw=ep` on both network
+engines. If `atlas-network` briefly becomes a zombie with exit status zero,
+the probe completed rather than crashed; if `sing-box-awg` and a TUN interface
+never appear, ATLAS rejected all probed connection combinations before tunnel
+startup. Missing native IPv6, blocked transports, the current Wi-Fi/router,
+the ISP, or unavailable remote endpoints can cause this. Trying a different
+network with working IPv6 is a useful isolation test.
+
+The sing-box 1.15 warning that the TUN `stack` option is deprecated is not the
+same error: the option still works in 1.15 but is scheduled for removal in
+1.17. ATLAS must eventually update the configuration it generates. Do not edit
+generated runtime JSON as an installer workaround; ATLAS may overwrite it.
+
+Before sharing diagnostics, remove repeated entries and redact public IP
+addresses, server hostnames, account identifiers, access links, tokens, and
+subscription data. Never share `account.json`, cookies, full runtime
+configuration files, or other credentials. Process names, exit status,
+capability output, and the short error text are normally sufficient.
 
 ## Event log
 
@@ -255,6 +308,9 @@ The latest installed version/hash and backup path are recorded under:
 ```text
 ~/.local/state/atlas-steamos-updater/atlas.json
 ```
+
+For a non-default container, the state filename is
+`atlas-<container-name>.json`.
 
 ## Uninstall
 

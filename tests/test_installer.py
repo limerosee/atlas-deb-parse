@@ -5,7 +5,9 @@ from __future__ import annotations
 import gzip
 import hashlib
 import io
+import os
 from pathlib import Path
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -97,6 +99,19 @@ def make_deb(
 
 
 class InstallerTests(unittest.TestCase):
+    def test_install_help_does_not_require_writable_home(self) -> None:
+        script = Path(__file__).resolve().parents[1] / "install.sh"
+        result = subprocess.run(
+            ["bash", str(script), "--help"],
+            env={**os.environ, "HOME": "/proc/atlas-read-only-home"},
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--install-atlas", result.stdout)
+
     def test_atlas_revision_ordering(self) -> None:
         self.assertLess(version_key("0.5.1-r2"), version_key("0.5.1-r10"))
 
