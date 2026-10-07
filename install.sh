@@ -18,6 +18,7 @@ if [[ -f "$state_dir/auto-update" ]] && [[ "$(sed -n '1p' "$state_dir/auto-updat
   auto_update=true
 fi
 atlas_package=""
+scan_downloads=false
 
 while (($#)); do
   case "$1" in
@@ -38,15 +39,16 @@ while (($#)); do
       shift
       ;;
     --install-atlas)
-      if (($# < 2)); then
-        echo "ERROR: --install-atlas requires the path to an ATLAS .deb" >&2
-        exit 2
+      if (($# >= 2)) && [[ "$2" != --* ]]; then
+        atlas_package="$2"
+        shift 2
+      else
+        scan_downloads=true
+        shift
       fi
-      atlas_package="$2"
-      shift 2
       ;;
     -h|--help)
-      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-atlas PACKAGE.deb]"
+      echo "Usage: ./install.sh [--container NAME] [--auto-update|--no-auto-update] [--install-atlas [PACKAGE.deb]]"
       exit 0
       ;;
     *)
@@ -73,26 +75,6 @@ else
   printf '%s\n' disabled > "$state_dir/auto-update"
 fi
 chmod 0600 "$state_dir/container" "$state_dir/source-path" "$state_dir/auto-update"
-
-if [[ -n "$atlas_package" ]]; then
-  if [[ -L "$atlas_package" || ! -f "$atlas_package" ]]; then
-    echo "ERROR: ATLAS package must be a regular, non-symlink file: $atlas_package" >&2
-    exit 2
-  fi
-  package_path="$(readlink -f -- "$atlas_package")"
-  home_path="$(readlink -f -- "$HOME")"
-  case "$package_path" in
-    "$home_path"/*) ;;
-    *)
-      echo "ERROR: ATLAS package must be stored under your home directory" >&2
-      exit 2
-      ;;
-  esac
-  if [[ "${package_path,,}" != *.deb ]]; then
-    echo "ERROR: ATLAS package filename must end in .deb" >&2
-    exit 2
-  fi
-fi
 
 current_vnd_handler="$(xdg-mime query default application/vnd.debian.binary-package 2>/dev/null || true)"
 current_xdeb_handler="$(xdg-mime query default application/x-deb 2>/dev/null || true)"
@@ -126,11 +108,88 @@ fi
 xdg-mime default atlas-steamos-updater.desktop application/vnd.debian.binary-package
 xdg-mime default atlas-steamos-updater.desktop application/x-deb
 
-if [[ -n "$atlas_package" ]]; then
+if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
   if distrobox enter "$container" -- test -e /usr/bin/atlas-preview; then
     echo "ERROR: ATLAS is already installed in Distrobox '$container'; use the normal updater" >&2
     exit 2
   fi
+
+  if [[ "$scan_downloads" == true ]]; then
+    downloads_dir="$HOME/Downloads"
+    if [[ ! -d "$downloads_dir" ]]; then
+      echo "ERROR: Downloads directory does not exist: $downloads_dir" >&2
+      exit 2
+    fi
+    atlas_candidates=()
+    atlas_versions=()
+    shopt -s nullglob nocaseglob
+    for candidate in "$downloads_dir"/*.deb; do
+      if [[ -L "$candidate" || ! -f "$candidate" ]]; then
+        continue
+      fi
+      if details="$(distrobox enter "$container" -- \
+        python3 "$libexec_dir/atlas_deb_installer.py" --inspect --json "$candidate" \
+        2>/dev/null)"; then
+        version="$(printf '%s' "$details" | python3 -c \
+          'import json, sys; print(json.load(sys.stdin)["version"])')"
+        atlas_candidates+=("$candidate")
+        atlas_versions+=("$version")
+      fi
+    done
+    shopt -u nullglob nocaseglob
+
+    if ((${#atlas_candidates[@]} == 0)); then
+      echo "ERROR: no valid ATLAS .deb packages were found in $downloads_dir" >&2
+      exit 2
+    fi
+
+    echo "Valid ATLAS packages found in Downloads:"
+    for index in "${!atlas_candidates[@]}"; do
+      printf '  %d) Version %s — %s\n' \
+        "$((index + 1))" \
+        "${atlas_versions[$index]}" \
+        "${atlas_candidates[$index]##*/}"
+    done
+    while true; do
+      printf 'Choose a package number and press Enter, or type N to cancel: '
+      if ! IFS= read -r choice; then
+        echo
+        echo "Cancelled."
+        exit 0
+      fi
+      if [[ "${choice,,}" == "n" ]]; then
+        echo "Cancelled."
+        exit 0
+      fi
+      if [[ "$choice" =~ ^[0-9]+$ ]]; then
+        choice_number=$((10#$choice))
+        if ((choice_number >= 1 && choice_number <= ${#atlas_candidates[@]})); then
+          atlas_package="${atlas_candidates[$((choice_number - 1))]}"
+          break
+        fi
+      fi
+      echo "Please enter one of the listed numbers or N, then press Enter."
+    done
+  fi
+
+  if [[ -L "$atlas_package" || ! -f "$atlas_package" ]]; then
+    echo "ERROR: ATLAS package must be a regular, non-symlink file: $atlas_package" >&2
+    exit 2
+  fi
+  package_path="$(readlink -f -- "$atlas_package")"
+  home_path="$(readlink -f -- "$HOME")"
+  case "$package_path" in
+    "$home_path"/*) ;;
+    *)
+      echo "ERROR: ATLAS package must be stored under your home directory" >&2
+      exit 2
+      ;;
+  esac
+  if [[ "${package_path,,}" != *.deb ]]; then
+    echo "ERROR: ATLAS package filename must end in .deb" >&2
+    exit 2
+  fi
+
   state_name="atlas.json"
   if [[ "$container" != "atlas" ]]; then
     state_name="atlas-$container.json"

@@ -143,22 +143,35 @@ distrobox create --name atlas-updater-test --image registry.fedoraproject.org/fe
 distrobox enter atlas-updater-test -- sudo dnf install -y git binutils zstd libcap
 ```
 
-Place the initial ATLAS Debian package anywhere under your home directory, then
-configure the handler and bootstrap ATLAS in the test container in one command:
+Place one or more ATLAS Debian packages directly in `$HOME/Downloads`, then run
+the interactive bootstrap:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
 ./install.sh \
   --container atlas-updater-test \
   --auto-update \
-  --install-atlas "$HOME/path/to/your-atlas-package.deb"
+  --install-atlas
 ```
 
-The filename and version may differ, but the filename must end in `.deb`. The
-same strict validator still requires package `atlas`, architecture `amd64`, and
-the allow-listed payload. Symlinks, non-ATLAS packages, and files outside your
-home directory are rejected. Bootstrap also refuses to replace an ATLAS binary
-already present in that container.
+The script scans only the top level of `Downloads`, silently rejects unrelated
+packages, and lists every package that passes the ATLAS validator with its
+version and filename. Enter the displayed number and press **Enter**, or enter
+`N` and press **Enter** to cancel. The filename and safe version may differ,
+but the filename must end in `.deb`. The validator still requires package
+`atlas`, architecture `amd64`, and the allow-listed payload. Symlinks are
+rejected. Bootstrap also refuses to replace an ATLAS binary already present in
+that container.
+
+You can bypass the menu by explicitly supplying a package stored anywhere
+under your home directory:
+
+```bash
+./install.sh \
+  --container atlas-updater-test \
+  --auto-update \
+  --install-atlas "$HOME/Downloads/your-atlas-package.deb"
+```
 
 After a successful bootstrap, launch the test copy directly:
 
