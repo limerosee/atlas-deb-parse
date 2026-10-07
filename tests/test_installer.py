@@ -103,6 +103,7 @@ class InstallerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
             files = dict(FILES)
+            del files["usr/lib/ATLAS/resources/atlas-network"]
             files["usr/bin/atlas"] = files.pop("usr/bin/atlas-preview")
             files["usr/share/icons/hicolor/32x32/apps/atlas.png"] = files.pop(
                 "usr/share/icons/hicolor/32x32/apps/atlas-preview.png"

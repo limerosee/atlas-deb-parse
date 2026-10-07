@@ -48,6 +48,12 @@ metadata, payload allow-listing, hashes, and user confirmation.
 
 ## Install
 
+Installation also adds a visible **ATLAS** entry to the SteamOS application
+menu. Its Bash launcher uses the configured Distrobox and detects `atlas` or
+`atlas-preview`. Legacy packages without `atlas-network` are accepted;
+capabilities are restored for the network engines that exist. The required
+`sing-box-awg`, desktop entry, checksums and payload restrictions still apply.
+
 ### One-command bootstrap with curl
 
 Create your Fedora Distrobox first, then run this on the SteamOS host:

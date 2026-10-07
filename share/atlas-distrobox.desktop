@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=ATLAS
+Comment=Run ATLAS in the configured Distrobox
+Exec="@LAUNCHER@"
+Icon=network-vpn
+Terminal=false
+Categories=Network;

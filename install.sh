@@ -121,6 +121,12 @@ install -m 0755 \
 install -m 0755 \
   "$project_dir/src/atlas_deb_installer.py" \
   "$libexec_dir/atlas_deb_installer.py"
+install -m 0755 "$project_dir/src/atlas-launch.sh" "$bin_dir/atlas-launch"
+install -m 0644 "$project_dir/share/atlas-distrobox.desktop" "$applications_dir/atlas-distrobox.desktop"
+launcher_path="$bin_dir/atlas-launch"
+escaped_launcher="${launcher_path//&/\\&}"
+escaped_launcher="${escaped_launcher//|/\\|}"
+sed -i "s|@LAUNCHER@|$escaped_launcher|" "$applications_dir/atlas-distrobox.desktop"
 install -m 0644 \
   "$project_dir/share/atlas-steamos-updater.desktop" \
   "$applications_dir/atlas-steamos-updater.desktop"

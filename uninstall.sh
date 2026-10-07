@@ -20,6 +20,8 @@ if [[ -s "$previous_xdeb_file" ]]; then
 fi
 
 rm -f \
+  "$HOME/.local/bin/atlas-launch" \
+  "$applications_dir/atlas-distrobox.desktop" \
   "$HOME/.local/bin/atlas-steamos-updater" \
   "$HOME/.local/libexec/atlas-steamos-updater/atlas_deb_installer.py" \
   "$applications_dir/atlas-steamos-updater.desktop"

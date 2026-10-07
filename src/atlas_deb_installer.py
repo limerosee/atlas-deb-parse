@@ -31,7 +31,6 @@ AR_MAGIC = b"!<arch>\n"
 MAX_PACKAGE_SIZE = 512 * 1024 * 1024
 MAX_PAYLOAD_SIZE = 300 * 1024 * 1024
 REQUIRED_FILES = {
-    "usr/lib/ATLAS/resources/atlas-network",
     "usr/lib/ATLAS/resources/sing-box-awg",
     "usr/share/applications/ATLAS.desktop",
 }
@@ -420,6 +419,8 @@ def restore_capabilities(root: Path) -> list[str]:
     installed: list[str] = []
     for relative in CAPABILITY_FILES:
         path = target_path(root, relative)
+        if not path.exists():
+            continue
         subprocess.run(
             [setcap, "cap_net_admin,cap_net_raw+ep", str(path)],
             check=True,
