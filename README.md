@@ -48,6 +48,22 @@ metadata, payload allow-listing, hashes, and user confirmation.
 
 ## Install
 
+### One-command bootstrap with curl
+
+Create your Fedora Distrobox first, then run this on the SteamOS host:
+
+```bash
+curl --fail --show-error --silent --location https://raw.githubusercontent.com/limerosee/atlas-deb-parse/main/bootstrap.sh -o /tmp/atlas-bootstrap.sh && bash /tmp/atlas-bootstrap.sh --container atlas1 --auto-update --install-atlas
+```
+
+The Bash bootstrap uses Git inside the selected Distrobox to download or update
+the repository in `$HOME/.local/share/atlas-steamos-updater/source`, then runs
+`install.sh` on the host. Terminal input remains available for package selection.
+For an existing ATLAS installation, omit `--install-atlas`. Local source changes
+and unrelated existing directories are refused rather than overwritten.
+Bootstrap and installation orchestration use Bash; secure package validation,
+rollback, and the update handler still require Python 3.
+
 ### Create the Distrobox
 
 Check whether the target container already exists:

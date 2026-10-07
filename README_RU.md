@@ -52,6 +52,22 @@ ATLAS проверяет подписанный манифест обновле�
 
 ## Установка
 
+### Установка одной командой через curl
+
+Сначала создайте Fedora Distrobox, затем на хосте SteamOS выполните:
+
+```bash
+curl --fail --show-error --silent --location https://raw.githubusercontent.com/limerosee/atlas-deb-parse/main/bootstrap.sh -o /tmp/atlas-bootstrap.sh && bash /tmp/atlas-bootstrap.sh --container atlas1 --auto-update --install-atlas
+```
+
+Bash-загрузчик скачивает или обновляет репозиторий через Git внутри выбранного
+Distrobox в `$HOME/.local/share/atlas-steamos-updater/source`, после чего запускает
+`install.sh` на хосте. Ввод в терминале остаётся доступным для выбора пакета.
+Если ATLAS уже установлен, уберите `--install-atlas`. Локальные изменения и
+посторонний существующий каталог не перезаписываются.
+Загрузчик и управление установкой написаны на Bash; проверка пакетов, откат и
+обработчик обновлений пока требуют Python 3.
+
 ### Создание Distrobox
 
 Сначала проверьте, существует ли уже нужный контейнер:

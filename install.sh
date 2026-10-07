@@ -16,6 +16,15 @@ for argument in "$@"; do
   esac
 done
 
+if [[ -n "${CONTAINER_ID:-}" || -e /run/.containerenv || -e /.dockerenv ]]; then
+  echo "ERROR: run install.sh on the SteamOS host. Type exit, then run it again." >&2
+  exit 2
+fi
+if ! command -v xdg-mime >/dev/null; then
+  echo "ERROR: xdg-mime is required on the SteamOS host" >&2
+  exit 2
+fi
+
 project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 bin_dir="$HOME/.local/bin"
 libexec_dir="$HOME/.local/libexec/atlas-steamos-updater"
