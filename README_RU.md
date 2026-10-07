@@ -56,12 +56,26 @@ sudo dnf install -y binutils zstd libcap
 
 ## Установка
 
-Распакуйте проект в домашний каталог и выполните на хосте SteamOS:
+Установите зависимости контейнера и клонируйте репозиторий через существующий
+Distrobox:
 
 ```bash
-chmod +x install.sh uninstall.sh src/*.py
+distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap
+distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+```
+
+По умолчанию Distrobox использует общий со SteamOS домашний каталог, поэтому
+клонированный каталог будет доступен и на хосте. Выйдите из контейнера, если вы
+вошли в него интерактивно, и запустите интеграционный скрипт **на хосте
+SteamOS**:
+
+```bash
+cd "$HOME/atlas-steamos-updater"
 ./install.sh
 ```
+
+Не запускайте `install.sh` внутри контейнера: он регистрирует MIME-обработчик на
+хосте, который используется, когда ATLAS открывает скачанный `.deb`.
 
 Установщик сохраняет предыдущий обработчик MIME для `.deb` и назначает
 `atlas-steamos-updater.desktop` обработчиком Debian-пакетов.
@@ -92,7 +106,10 @@ chmod +x install.sh uninstall.sh src/*.py
 
 ## Удаление
 
+Выполните на хосте SteamOS:
+
 ```bash
+cd "$HOME/atlas-steamos-updater"
 ./uninstall.sh
 ```
 
