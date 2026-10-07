@@ -56,18 +56,52 @@ sudo dnf install -y binutils zstd libcap
 
 ## Установка
 
-Установите зависимости контейнера и клонируйте репозиторий через существующий
-Distrobox:
+Сначала установите зависимости контейнера:
 
 ```bash
 distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap
+```
+
+### Первая установка: клонирование
+
+Выполняйте эту команду, только если каталога `$HOME/atlas-steamos-updater` ещё
+нет:
+
+```bash
 distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
 ```
 
 По умолчанию Distrobox использует общий со SteamOS домашний каталог, поэтому
-клонированный каталог будет доступен и на хосте. Выйдите из контейнера, если вы
-вошли в него интерактивно, и запустите интеграционный скрипт **на хосте
-SteamOS**:
+клонированный каталог будет доступен и на хосте.
+
+### Обновление существующего клона
+
+Если каталог уже существует, обновите его вместо повторного запуска
+`git clone`:
+
+```bash
+distrobox enter atlas -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
+```
+
+Параметр `--ff-only` защищает локальную работу: Git откажется перезаписывать
+несовпадающие коммиты или незакоммиченные изменения.
+
+### Безопасная замена повреждённого или постороннего каталога
+
+Если существующий каталог не является Git-репозиторием или не обновляется,
+сохраните его как резервную копию с отметкой времени и клонируйте чистую копию.
+Выполните эти команды на хосте SteamOS:
+
+```bash
+mv "$HOME/atlas-steamos-updater" "$HOME/atlas-steamos-updater.backup-$(date +%Y%m%d-%H%M%S)"
+distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+```
+
+### Установка или обновление интеграции на хосте
+
+После клонирования, обновления или замены checkout запустите интеграционный
+скрипт **на хосте SteamOS**. Повторный запуск заменяет установленные ранее
+скрипты updater их текущими версиями из репозитория:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"

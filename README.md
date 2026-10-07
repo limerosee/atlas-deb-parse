@@ -52,17 +52,51 @@ sudo dnf install -y binutils zstd libcap
 
 ## Install
 
-Install the container dependencies and clone the repository through the
-existing Distrobox:
+Install the container dependencies first:
 
 ```bash
 distrobox enter atlas -- sudo dnf install -y git binutils zstd libcap
+```
+
+### First installation: clone
+
+Run this only when `$HOME/atlas-steamos-updater` does not already exist:
+
+```bash
 distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
 ```
 
 Distrobox shares the home directory with SteamOS by default, so the cloned
-directory is also available on the host. Exit the container if you entered it
-interactively, then run the integration script on the **SteamOS host**:
+directory is also available on the host.
+
+### Update an existing clone
+
+If the directory already exists, update it instead of running `git clone`
+again:
+
+```bash
+distrobox enter atlas -- git -C "$HOME/atlas-steamos-updater" pull --ff-only
+```
+
+`--ff-only` protects local work by refusing to overwrite divergent commits or
+uncommitted changes.
+
+### Safely replace a broken or unrelated directory
+
+If the existing directory is not a Git checkout or cannot be updated, preserve
+it as a timestamped backup and clone a clean copy. Run these commands on the
+SteamOS host:
+
+```bash
+mv "$HOME/atlas-steamos-updater" "$HOME/atlas-steamos-updater.backup-$(date +%Y%m%d-%H%M%S)"
+distrobox enter atlas -- git clone https://github.com/limerosee/atlas-deb-parse.git "$HOME/atlas-steamos-updater"
+```
+
+### Install or refresh the host integration
+
+After cloning, updating, or replacing the checkout, run the integration script
+on the **SteamOS host**. Running it again replaces the previously installed
+updater scripts with the current repository version:
 
 ```bash
 cd "$HOME/atlas-steamos-updater"
