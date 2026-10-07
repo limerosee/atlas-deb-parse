@@ -1,5 +1,7 @@
 # ATLAS SteamOS Updater
 
+[Русская версия](README_RU.md)
+
 A purpose-built update compatibility helper for ATLAS on SteamOS. It catches
 the `.deb` update opened by ATLAS, validates the package, and installs its
 allow-listed payload inside the existing Fedora Distrobox named `atlas`.
