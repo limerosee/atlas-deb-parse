@@ -212,17 +212,19 @@ if [[ -n "$atlas_package" || "$scan_downloads" == true ]]; then
       printf '     SHA-256: %s\n' "${atlas_hashes[$index]}"
     done
     while true; do
-      printf 'Choose a package number and press Enter, or type N to cancel: '
+      printf 'Choose a package number and press Enter, or type N / no / нет / none to cancel: '
       if ! IFS= read -r choice; then
         echo
         echo "Cancelled."
         exit 0
       fi
-      if [[ "${choice,,}" == "n" ]]; then
+      choice="${choice#"${choice%%[![:space:]]*}"}"
+      choice="${choice%"${choice##*[![:space:]]}"}"
+      if [[ "${choice,,}" =~ ^(n|no|нет|none|cancel|отмена)$ ]]; then
         echo "Cancelled."
         exit 0
       fi
-      if [[ "$choice" =~ ^[0-9]+$ ]]; then
+      if [[ "$choice" =~ ^[0-9]{1,6}$ ]]; then
         choice_number=$((10#$choice))
         if ((choice_number >= 1 && choice_number <= ${#atlas_candidates[@]})); then
           atlas_package="${atlas_candidates[$((choice_number - 1))]}"
