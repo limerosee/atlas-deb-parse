@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import atlas_deb_installer
 from atlas_deb_installer import PackageError, inspect_package, install_package
-from atlas_steamos_updater import log_event, version_key
+from atlas_steamos_updater import log_event, prompt, version_key
 
 
 FILES = {
@@ -107,6 +107,20 @@ class InstallerTests(unittest.TestCase):
             state_path.write_text("not a directory")
             with mock.patch.dict("os.environ", {"HOME": directory}):
                 log_event("open-request", file="update.deb")
+
+    def test_prompt_accepts_explicit_y(self) -> None:
+        with mock.patch("builtins.input", return_value="Y"):
+            self.assertTrue(prompt("Continue?"))
+
+    def test_prompt_accepts_explicit_n(self) -> None:
+        with mock.patch("builtins.input", return_value="N"):
+            self.assertFalse(prompt("Continue?"))
+
+    def test_prompt_repeats_until_y_or_n(self) -> None:
+        with mock.patch("builtins.input", side_effect=["", "yes", "y"]):
+            with mock.patch("builtins.print") as print_mock:
+                self.assertTrue(prompt("Continue?"))
+        self.assertEqual(print_mock.call_count, 2)
 
     def test_valid_package_and_test_root_install(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

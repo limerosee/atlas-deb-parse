@@ -110,9 +110,12 @@ The installer records the previous `.deb` MIME handler and makes
 `atlas-steamos-updater.desktop` the handler for Debian packages.
 
 When ATLAS downloads an update and opens it, a terminal appears. The updater
-shows the package version and SHA-256, asks for confirmation, closes ATLAS if
-you approve, requests the container sudo password, installs the update, restores
-capabilities, and offers to relaunch ATLAS.
+shows the package version and SHA-256, then asks `Would you like to update
+ATLAS? [Y/N]`. After a successful installation it asks `Would you like to open
+ATLAS now? [Y/N]`; answering `Y` launches ATLAS immediately. Each prompt
+requires an explicit `Y` or `N`. The updater closes a running ATLAS only with
+confirmation, requests the container sudo password, installs the update, and
+restores capabilities.
 
 Packages outside ATLAS's own update directory are rejected.
 

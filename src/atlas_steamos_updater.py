@@ -91,10 +91,16 @@ def run_in_container(arguments: list[str], *, capture: bool = False) -> subproce
 
 
 def prompt(question: str) -> bool:
-    try:
-        return input(f"{question} [y/N] ").strip().lower() in {"y", "yes"}
-    except EOFError:
-        return False
+    while True:
+        try:
+            answer = input(f"{question} [Y/N] ").strip().lower()
+        except EOFError:
+            return False
+        if answer == "y":
+            return True
+        if answer == "n":
+            return False
+        print("Please enter Y or N.")
 
 
 def version_key(value: str) -> tuple[tuple[int, object], ...]:
@@ -185,14 +191,14 @@ def main() -> int:
         print(f"  SHA-256: {details['sha256']}")
         print(f"  Files:   {len(details['files'])}")
         print("The Debian maintainer scripts will NOT be executed.")
-        if not prompt("Install this update into Distrobox 'atlas'?"):
+        if not prompt("Would you like to update ATLAS?"):
             log_event("cancelled", file=path.name, version=details.get("version"))
             print("Cancelled.")
             return 0
 
         process_check = run_in_container(["pgrep", "-x", "atlas-preview"], capture=True)
         if process_check.returncode == 0:
-            if not prompt("ATLAS is running. Stop it before updating?"):
+            if not prompt("ATLAS is running. Would you like to close it before updating?"):
                 raise HandlerError("ATLAS must be closed before installation")
             stop_result = run_in_container(["pkill", "-TERM", "-x", "atlas-preview"])
             if stop_result.returncode not in {0, 1}:
@@ -215,7 +221,7 @@ def main() -> int:
             raise HandlerError("installation failed; see the error above")
 
         relaunched = False
-        if not args.no_relaunch and prompt("Relaunch ATLAS now?"):
+        if not args.no_relaunch and prompt("Would you like to open ATLAS now?"):
             subprocess.Popen(
                 ["distrobox", "enter", CONTAINER, "--", "/usr/bin/atlas-preview"],
                 stdin=subprocess.DEVNULL,
